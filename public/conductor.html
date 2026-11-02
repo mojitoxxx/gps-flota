@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS Flota · Conductor</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <header><h1>GPS <span>Flota</span> · Conductor</h1>
+    <button class="sec oculto" id="btnSalir">Salir</button></header>
+  <main>
+    <!-- 1. Entrar -->
+    <section id="vLogin" class="tarjeta">
+      <h2>Entrar</h2>
+      <label>Código de conductor</label><input id="codigo" placeholder="C123456" autocomplete="username">
+      <label>PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="current-password">
+      <p class="error" id="errLogin"></p>
+      <button class="grande" id="btnEntrar">Entrar</button>
+    </section>
+
+    <!-- 2. Aviso de geolocalización (art. 90 LOPDGDD) -->
+    <section id="vAviso" class="tarjeta oculto">
+      <h2>Aviso sobre la geolocalización</h2>
+      <div class="aviso" id="textoAviso"></div>
+      <button class="grande" id="btnAceptar">He leído y entiendo el aviso</button>
+    </section>
+
+    <!-- 3. Jornada -->
+    <section id="vJornada" class="oculto">
+      <div class="tarjeta">
+        <p>Hola, <b id="nombre"></b> · <span id="empresa" class="nota"></span></p>
+        <p>Estado: <span id="estado" class="estado off">Sin jornada · ubicación desactivada</span></p>
+        <div id="bloqueInicio">
+          <label>Camión</label><select id="camion"></select>
+          <button class="grande" id="btnIniciar">Iniciar jornada</button>
+        </div>
+        <div id="bloqueFin" class="oculto">
+          <p class="nota" id="infoGps">Esperando señal GPS…</p>
+          <button class="grande peligro" id="btnFinalizar">Finalizar jornada</button>
+        </div>
+        <p class="error" id="errJornada"></p>
+        <p class="nota">Tu ubicación solo se registra mientras la jornada está iniciada. Mantén esta pantalla abierta.</p>
+      </div>
+      <div id="mapa" class="mapa"></div>
+      <div class="tarjeta" style="margin-top:16px">
+        <h2>Mis jornadas registradas</h2>
+        <table><thead><tr><th>Inicio</th><th>Fin</th><th>Camión</th><th>Puntos</th></tr></thead>
+          <tbody id="misJornadas"></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="comun.js"></script>
+  <script>
+    const S = sesion('conductor');
+    const $ = id => document.getElementById(id);
+    let watchId = null, cola = [], mapa, marca, linea;
+
+    function ver(v) { ['vLogin', 'vAviso', 'vJornada'].forEach(x => $(x).classList.toggle('oculto', x !== v)); $('btnSalir').classList.toggle('oculto', v === 'vLogin'); }
+
+    $('btnEntrar').onclick = async () => {
+      try {
+        const r = await api('/api/conductor/login', { codigo: $('codigo').value, pin: $('pin').value });
+        S.guardar({ token: r.token, nombre: r.nombre, empresa: r.empresa });
+        arrancar();
+      } catch (e) { $('errLogin').textContent = e.message; }
+    };
+    $('btnSalir').onclick = () => { pararGps(); S.borrar(); ver('vLogin'); };
+
+    $('btnAceptar').onclick = async () => { await api('/api/conductor/aceptar-aviso', {}, S.token()); arrancar(); };
+
+    async function arrancar() {
+      if (!S.token()) return ver('vLogin');
+      let est;
+      try { est = await api('/api/conductor/estado', null, S.token()); }
+      catch { S.borrar(); return ver('vLogin'); }
+      if (!est.aviso_aceptado) {
+        $('textoAviso').innerHTML = await (await fetch('aviso-conductor.html')).text();
+        return ver('vAviso');
+      }
+      ver('vJornada');
+      $('nombre').textContent = S.datos().nombre; $('empresa').textContent = S.datos().empresa;
+      $('camion').innerHTML = est.camiones.map(c => `<option value="${c.id}">${esc(c.matricula)} ${esc(c.descripcion)}</option>`).join('');
+      if (!mapa) {
+        mapa = crearMapa('mapa');
+        linea = L.polyline([], { color: '#e8710a', weight: 5 }).addTo(mapa);
+      }
+      pintarEstado(est.jornada);
+      if (est.jornada) iniciarGps();
+      cargarMisJornadas();
+    }
+
+    function pintarEstado(j) {
+      $('bloqueInicio').classList.toggle('oculto', !!j);
+      $('bloqueFin').classList.toggle('oculto', !j);
+      $('estado').className = 'estado ' + (j ? 'on' : 'off');
+      $('estado').textContent = j ? `Jornada activa · ${j.matricula} · ubicación registrándose` : 'Sin jornada · ubicación desactivada';
+    }
+
+    $('btnIniciar').onclick = async () => {
+      $('errJornada').textContent = '';
+      try {
+        await api('/api/conductor/jornada/iniciar', { camion_id: Number($('camion').value) }, S.token());
+        linea.setLatLngs([]);
+        arrancar();
+      } catch (e) { $('errJornada').textContent = e.message; }
+    };
+    $('btnFinalizar').onclick = async () => {
+      if (!confirm('¿Finalizar la jornada? Se dejará de registrar tu ubicación.')) return;
+      await enviarCola();
+      pararGps();
+      await api('/api/conductor/jornada/finalizar', {}, S.token());
+      arrancar();
+    };
+
+    function iniciarGps() {
+      if (watchId !== null) return;
+      if (!navigator.geolocation) { $('infoGps').textContent = 'Este dispositivo no tiene GPS disponible.'; return; }
+      watchId = navigator.geolocation.watchPosition(p => {
+        const punto = { lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy,
+          velocidad: p.coords.speed != null ? Math.round(p.coords.speed * 3.6) : null, ts: new Date(p.timestamp).toISOString() };
+        cola.push(punto);
+        const ll = [punto.lat, punto.lng];
+        linea.addLatLng(ll);
+        if (!marca) marca = L.marker(ll).addTo(mapa); else marca.setLatLng(ll);
+        mapa.setView(ll, Math.max(mapa.getZoom(), 15));
+        $('infoGps').textContent = `Precisión ±${Math.round(punto.precision)} m` + (punto.velocidad != null ? ` · ${punto.velocidad} km/h` : '') + ` · pendientes de enviar: ${cola.length}`;
+      }, err => { $('infoGps').textContent = 'Error de GPS: ' + err.message; },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    }
+    function pararGps() { if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+    // Envía cada 15 s; si no hay cobertura, los puntos esperan en la cola
+    async function enviarCola() {
+      if (!cola.length || !S.token()) return;
+      const lote = cola.splice(0, 500);
+      try { await api('/api/conductor/posiciones', lote, S.token()); }
+      catch { cola = lote.concat(cola); }
+    }
+    setInterval(enviarCola, 15000);
+
+    async function cargarMisJornadas() {
+      const js = await api('/api/conductor/mis-jornadas', null, S.token());
+      $('misJornadas').innerHTML = js.map(j => `<tr><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${esc(j.matricula)}</td><td>${j.puntos}</td></tr>`).join('')
+        || '<tr><td colspan="4" class="nota">Aún no hay jornadas</td></tr>';
+    }
+
+    arrancar();
+  </script>
+</body>
+</html>

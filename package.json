@@ -1,0 +1,16 @@
+{
+  "name": "gps-flota",
+  "version": "0.1.0",
+  "description": "Seguimiento de camiones para empresas",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  }
+}
