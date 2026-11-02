@@ -64,3 +64,11 @@ La carpeta `android-app/` contiene la app de Android hecha con Capacitor: abre l
 No hace falta instalar nada para compilarla. **GitHub Actions** (`.github/workflows/apk.yml`) la compila cada vez que cambia algo en `android-app/`, y deja el archivo en `public/gps-flota.apk`. Así se descarga desde el botón de la portada de la web. También se puede lanzar a mano desde la pestaña **Actions** del repositorio, con **Compilar APK → Run workflow**.
 
 Es una APK de prueba (firmada en modo debug): sirve para instalarla directamente en el móvil, pero no para subirla a Google Play. Para Play hace falta una versión firmada (AAB) y la grabación de la ubicación con la pantalla apagada.
+
+### Aviso de versión nueva
+
+Cada APK que compila GitHub lleva un número de versión (el número de la ejecución de GitHub Actions) y se firma siempre con la misma clave (`android-app/firma/debug.keystore`), para que se pueda instalar encima de la anterior. El proceso publica también `public/app-version.json`. Cuando un conductor abre la app y hay una versión más nueva, la app muestra el aviso **"Hay una versión nueva de la app"** con el botón **Actualizar**, que descarga la APK nueva para instalarla.
+
+Los cambios de la web (pantallas, diseño, funciones) se ven en la app al momento, sin reinstalar: la app abre la web publicada. Solo hace falta una APK nueva cuando cambia algo de `android-app/`.
+
+La clave de `android-app/firma/` es solo para estas APK de prueba. Para Google Play hay que crear una clave de subida propia y guardarla fuera del repositorio.

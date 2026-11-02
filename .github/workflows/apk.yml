@@ -34,10 +34,17 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Número de versión
+        run: |
+          echo "VERSION_CODE=${{ github.run_number }}" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.${{ github.run_number }}" >> $GITHUB_ENV
+
       - name: Crear el proyecto Android
         working-directory: android-app
         run: |
           npm ci
+          # La app se identifica con su versión para que la web pueda avisar de actualizaciones
+          node -e "const f='capacitor.config.json',c=require('./'+f);c.appendUserAgent='GPSFlotaApp/'+process.env.VERSION_CODE;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
           npx cap add android
           npx capacitor-assets generate --android || echo "No se pudieron generar los iconos; se usan los de serie"
 
@@ -47,6 +54,15 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />#' $M
           grep -q ACCESS_FINE_LOCATION $M
+
+      - name: Versión, firma y código propio
+        working-directory: android-app
+        run: |
+          sed -i -E "s/versionCode [0-9]+/versionCode $VERSION_CODE/; s/versionName \"[^\"]*\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
+          grep -q "versionCode $VERSION_CODE" android/app/build.gradle
+          # Siempre la misma firma, para que cada APK nueva se instale encima de la anterior
+          mkdir -p ~/.android && cp firma/debug.keystore ~/.android/debug.keystore
+          cp nativo/MainActivity.java android/app/src/main/java/es/gpsflota/app/MainActivity.java
           npx cap sync android
 
       - name: Compilar
@@ -62,9 +78,10 @@ jobs:
       - name: Publicarla en la web
         run: |
           cp android-app/android/app/build/outputs/apk/debug/app-debug.apk public/gps-flota.apk
+          echo "{\"versionCode\": $VERSION_CODE, \"versionName\": \"$VERSION_NAME\"}" > public/app-version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/gps-flota.apk
-          git commit -m "APK Android actualizada"
+          git add public/gps-flota.apk public/app-version.json
+          git commit -m "APK Android $VERSION_NAME"
           git pull --rebase origin main
           git push origin HEAD:main

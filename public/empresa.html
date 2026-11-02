@@ -53,7 +53,7 @@
         </div>
         <div id="mapaHistorial" class="mapa"></div>
         <div class="tarjeta" style="margin-top:16px">
-          <table><thead><tr><th>Camión</th><th>Conductor</th><th>Inicio</th><th>Fin</th><th>Km aprox.</th></tr></thead>
+          <table class="apilada"><thead><tr><th>Camión</th><th>Conductor</th><th>Inicio</th><th>Fin</th><th>Km aprox.</th></tr></thead>
             <tbody id="tablaHistorial"></tbody></table>
         </div>
       </div>
@@ -170,7 +170,7 @@
         L.marker(ll[ll.length - 1], { icon: iconoCamion(j.matricula, false) }).addTo(capaH).bindPopup('Último punto ' + fecha(j.puntos.at(-1).ts));
       });
       if (todos.length) mapaH.fitBounds(todos, { padding: [30, 30] });
-      $('tablaHistorial').innerHTML = js.map(j => `<tr><td>${placa(j.matricula)}</td><td>${esc(j.conductor)}</td><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${km(j.puntos)}</td></tr>`).join('')
+      $('tablaHistorial').innerHTML = js.map(j => `<tr><td>${placa(j.matricula)}</td><td>${esc(j.conductor)}</td><td data-etiqueta="Inicio">${fecha(j.inicio)}</td><td data-etiqueta="Fin">${j.fin ? fecha(j.fin) : 'En curso'}</td><td data-etiqueta="Km aprox.">${km(j.puntos)}</td></tr>`).join('')
         || '<tr><td colspan="5" class="nota">No hay rutas ese día</td></tr>';
     };
 

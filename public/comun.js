@@ -83,3 +83,31 @@ function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fecha = iso => new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+
+// ---------- Aviso de versión nueva de la app Android ----------
+// La app añade "GPSFlotaApp/<número de versión>" a su identificador de navegador.
+// Si /app-version.json indica una versión mayor, se avisa al conductor para que la instale.
+(function avisoVersionApp() {
+  const m = navigator.userAgent.match(/GPSFlotaApp\/(\d+)/);
+  if (!m) return;
+  const actual = Number(m[1]);
+  document.documentElement.classList.add('en-app');
+  const comprobar = async () => {
+    let v;
+    try { v = await (await fetch('/app-version.json', { cache: 'no-store' })).json(); } catch { return; }
+    if (!v || !(v.versionCode > actual) || document.querySelector('.aviso-version')) return;
+    try { if (sessionStorage.getItem('gpsflota_aviso_oculto') === String(v.versionCode)) return; } catch {}
+    const barra = document.createElement('div');
+    barra.className = 'aviso-version';
+    barra.setAttribute('role', 'status');
+    barra.innerHTML = `<span>Hay una versión nueva de la app (${esc(v.versionName || v.versionCode)}).</span>
+      <a href="/gps-flota.apk?v=${v.versionCode}">Actualizar</a><button type="button">Más tarde</button>`;
+    barra.querySelector('button').onclick = () => {
+      barra.remove();
+      try { sessionStorage.setItem('gpsflota_aviso_oculto', String(v.versionCode)); } catch {}
+    };
+    document.body.prepend(barra);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', comprobar); else comprobar();
+  setInterval(comprobar, 30 * 60 * 1000);  // también mientras la app sigue abierta
+})();
