@@ -1,45 +1,155 @@
+/* GPS Flota · estética de señalización de autopista */
 :root {
-  --fondo: #f4f5f2; --panel: #ffffff; --texto: #1d2321; --suave: #5f6b66;
-  --borde: #d9ddd8; --acento: #e8710a; --acento-osc: #b85600; --ok: #1f8a4c; --peligro: #c0392b;
+  --asfalto: #23272b;
+  --asfalto-2: #2f3439;
+  --cartel: #0a4d9c;        /* azul de cartel de autovía */
+  --cartel-osc: #083d7c;
+  --ambar: #f2a900;         /* amarillo de obra / en marcha */
+  --rojo: #c8322b;
+  --verde: #1e8a4c;
+  --fondo: #e8ebee;
+  --panel: #ffffff;
+  --texto: #1c2024;
+  --suave: #5c6670;
+  --borde: #d3d8dd;
+  --radio: 6px;
+  --letra: "Overpass", system-ui, "Segoe UI", Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --fondo: #151918; --panel: #1f2523; --texto: #e9ece9; --suave: #9aa6a1; --borde: #333b38; }
+  :root {
+    --fondo: #181b1e; --panel: #23272b; --texto: #e8ebee; --suave: #9aa4ad; --borde: #363c42;
+  }
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: var(--fondo); color: var(--texto); line-height: 1.45; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--borde); }
-header h1 { font-size: 1.15rem; margin: 0; }
-header h1 span { color: var(--acento); }
-main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-.tarjeta { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-h2 { font-size: 1.05rem; margin: 0 0 12px; }
-label { display: block; font-size: .85rem; color: var(--suave); margin: 10px 0 4px; }
-input, select { width: 100%; padding: 10px; border: 1px solid var(--borde); border-radius: 8px;
-  background: var(--fondo); color: var(--texto); font-size: 1rem; }
-button { padding: 10px 16px; border: 0; border-radius: 8px; background: var(--acento); color: #fff;
-  font-size: 1rem; font-weight: 600; cursor: pointer; }
-button:hover { background: var(--acento-osc); }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; font-family: var(--letra); font-size: 16px; line-height: 1.5;
+  background: var(--fondo); color: var(--texto);
+}
+a { color: var(--cartel); }
+@media (prefers-color-scheme: dark) { a { color: #7fb2f0; } }
+
+/* ---------- Cabecera: asfalto con línea discontinua ---------- */
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; background: var(--asfalto); color: #fff; position: relative;
+}
+header::after { /* marca vial discontinua */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+  background: repeating-linear-gradient(90deg, var(--ambar) 0 28px, transparent 28px 48px);
+}
+.marca { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.marca svg { width: 30px; height: 30px; flex: none; }
+header h1 { font-size: 1.15rem; font-weight: 800; margin: 0; letter-spacing: .01em; }
+header h1 small { font-weight: 400; color: #b8c0c8; font-size: .95rem; margin-left: 6px; }
+header button.sec, header a.sec { color: #fff; border-color: #4a5158; padding: 6px 14px; font-size: .95rem; }
+header button.sec:hover { background: var(--asfalto-2); }
+
+main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+
+/* ---------- Bloques ---------- */
+.tarjeta {
+  background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 18px; margin-bottom: 16px;
+}
+h2 { font-size: 1.15rem; font-weight: 800; margin: 0 0 12px; }
+label { display: block; font-size: .88rem; font-weight: 600; color: var(--suave); margin: 12px 0 4px; }
+input, select {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--fondo); color: var(--texto); font: inherit;
+}
+input:focus, select:focus { outline: 3px solid color-mix(in srgb, var(--cartel) 35%, transparent); border-color: var(--cartel); }
+
+button {
+  font: inherit; font-weight: 700; padding: 11px 18px; border: 0; border-radius: var(--radio);
+  background: var(--cartel); color: #fff; cursor: pointer;
+}
+button:hover { background: var(--cartel-osc); }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--ambar); outline-offset: 2px; }
 button.sec { background: transparent; color: var(--texto); border: 1px solid var(--borde); }
-button.peligro { background: var(--peligro); }
-button.grande { width: 100%; padding: 16px; font-size: 1.15rem; margin-top: 12px; }
-.fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
-.fila > * { flex: 1 1 160px; }
+button.sec:hover { background: color-mix(in srgb, var(--borde) 40%, transparent); }
+button.peligro { background: var(--rojo); }
+button.peligro:hover { background: #a52822; }
+button.grande { width: 100%; padding: 18px; font-size: 1.2rem; margin-top: 14px; }
+
+.fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.fila > * { flex: 1 1 170px; }
+.fila > .ajustado { flex: 0 0 auto; }
 .oculto { display: none !important; }
-.error { color: var(--peligro); font-size: .9rem; min-height: 1.2em; }
-.nota { color: var(--suave); font-size: .85rem; }
-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--borde); }
-.mapa { height: 420px; border-radius: 10px; border: 1px solid var(--borde); }
-.estado { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: .85rem; font-weight: 600; }
-.estado.on { background: #d8f2e3; color: var(--ok); }
-.estado.off { background: #eceeec; color: var(--suave); }
-.aviso { max-height: 300px; overflow: auto; font-size: .9rem; border: 1px solid var(--borde); padding: 12px; border-radius: 8px; }
-.pestanas { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-.pestanas button { background: transparent; color: var(--texto); border: 1px solid var(--borde); }
-.pestanas button.activa { background: var(--acento); color: #fff; border-color: var(--acento); }
-.inicio { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.inicio a { text-decoration: none; color: inherit; }
-.inicio .tarjeta:hover { border-color: var(--acento); }
-code { background: var(--fondo); padding: 2px 6px; border-radius: 4px; }
+.error { color: var(--rojo); font-size: .92rem; min-height: 1.3em; margin: 8px 0 0; }
+.nota { color: var(--suave); font-size: .9rem; }
+
+table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+th { text-align: left; font-weight: 700; color: var(--suave); font-size: .85rem; padding: 6px; border-bottom: 2px solid var(--borde); }
+td { padding: 10px 6px; border-bottom: 1px solid var(--borde); }
+tr:last-child td { border-bottom: 0; }
+
+.mapa { height: 460px; border-radius: var(--radio); border: 1px solid var(--borde); }
+
+/* ---------- Estado de jornada ---------- */
+.estado { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px; font-size: .9rem; font-weight: 700; }
+.estado::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.estado.on { background: #fff3cc; color: #7a5300; }
+.estado.on::before { background: var(--ambar); box-shadow: 0 0 0 0 var(--ambar); animation: latido 1.8s infinite; }
+.estado.off { background: color-mix(in srgb, var(--borde) 55%, transparent); color: var(--suave); }
+@keyframes latido { 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+.aviso { max-height: 320px; overflow: auto; font-size: .94rem; border: 1px solid var(--borde); padding: 14px; border-radius: var(--radio); }
+
+/* ---------- Pestañas ---------- */
+.pestanas { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--borde); flex-wrap: wrap; }
+.pestanas button {
+  background: transparent; color: var(--suave); border-radius: 0; padding: 10px 14px;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+}
+.pestanas button:hover { background: transparent; color: var(--texto); }
+.pestanas button.activa { color: var(--texto); border-bottom-color: var(--cartel); }
+
+/* ---------- Placa de matrícula española ---------- */
+.placa {
+  display: inline-flex; align-items: stretch; border: 1.5px solid #1c2024; border-radius: 3px;
+  background: #fff; color: #1c2024; font-weight: 800; font-size: .85rem; line-height: 1; overflow: hidden;
+  letter-spacing: .06em; white-space: nowrap;
+}
+.placa::before { content: "E"; background: #0a3f9c; color: #fff; font-size: .62rem; padding: 6px 3px 2px; display: flex; align-items: flex-end; letter-spacing: 0; }
+.placa span { padding: 4px 6px 3px; }
+
+/* Marcador de camión en el mapa */
+.marcador-camion { background: none; border: 0; }
+.marcador-camion .cuerpo { display: flex; flex-direction: column; align-items: center; gap: 3px; transform: translateY(-6px); }
+.marcador-camion .icono {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--cartel); border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35); display: grid; place-items: center;
+}
+.marcador-camion .icono svg { width: 19px; height: 19px; }
+.marcador-camion.activo .icono { background: var(--ambar); }
+
+/* ---------- Portada: cartel de autovía ---------- */
+.portada { max-width: 760px; margin: 12px auto 0; }
+.cartel {
+  background: var(--cartel); color: #fff; border-radius: 10px; padding: 8px;
+  box-shadow: 0 10px 30px rgba(10, 40, 90, .25);
+}
+.cartel-marco { border: 3px solid #fff; border-radius: 6px; padding: 28px 28px 20px; }
+.cartel h2 { font-size: clamp(2.2rem, 7vw, 3.6rem); font-weight: 900; line-height: 1; margin: 0 0 10px; letter-spacing: -.01em; }
+.cartel p.lema { font-size: 1.15rem; margin: 0 0 26px; color: #dbe7f6; max-width: 34ch; }
+.salidas { display: grid; gap: 12px; }
+.salida {
+  display: flex; align-items: center; gap: 16px; text-decoration: none; color: #fff;
+  border-top: 2px solid rgba(255,255,255,.35); padding: 16px 4px 6px;
+}
+.salida:hover .flecha, .salida:focus-visible .flecha { transform: translateX(6px); }
+.salida .flecha { flex: none; width: 44px; height: 44px; transition: transform .2s; }
+.salida b { display: block; font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.salida div span { display: block; color: #dbe7f6; font-size: .98rem; }
+.salida .panel-salida { margin-left: auto; flex: none; background: #fff; color: var(--cartel); font-weight: 900; border-radius: 4px; padding: 4px 10px; font-size: .95rem; }
+.pie-portada { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 520px) {
+  .cartel-marco { padding: 20px 16px 14px; }
+  .panel-salida { display: none; }
+  .mapa { height: 380px; }
+}
+code { background: var(--fondo); padding: 2px 6px; border-radius: 4px; font-size: .95em; }
+.credenciales { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; background: #fff3cc; color: #4d3500; border: 1px solid #f2d27a; border-radius: var(--radio); padding: 12px 14px; margin-top: 12px; }
+.credenciales code { background: #fff; font-size: 1.1rem; font-weight: 800; }

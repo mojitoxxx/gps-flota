@@ -4,11 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GPS Flota · Conductor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&display=swap">
+  <meta name="theme-color" content="#23272b">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
-  <header><h1>GPS <span>Flota</span> · Conductor</h1>
+  <header><a class="marca" href="/"><img src="icono.svg" alt="" width="30" height="30"><h1>GPS Flota<small>Conductor</small></h1></a>
     <button class="sec oculto" id="btnSalir">Salir</button></header>
   <main>
     <!-- 1. Entrar -->
@@ -30,8 +34,9 @@
     <!-- 3. Jornada -->
     <section id="vJornada" class="oculto">
       <div class="tarjeta">
-        <p>Hola, <b id="nombre"></b> · <span id="empresa" class="nota"></span></p>
-        <p>Estado: <span id="estado" class="estado off">Sin jornada · ubicación desactivada</span></p>
+        <h2>Hola, <span id="nombre"></span></h2>
+        <p class="nota" id="empresa" style="margin-top:-8px"></p>
+        <p><span id="estado" class="estado off">Sin jornada: ubicación desactivada</span></p>
         <div id="bloqueInicio">
           <label>Camión</label><select id="camion"></select>
           <button class="grande" id="btnIniciar">Iniciar jornada</button>
@@ -57,7 +62,7 @@
   <script>
     const S = sesion('conductor');
     const $ = id => document.getElementById(id);
-    let watchId = null, cola = [], mapa, marca, linea;
+    let watchId = null, cola = [], mapa, marca, linea, matActual = '';
 
     function ver(v) { ['vLogin', 'vAviso', 'vJornada'].forEach(x => $(x).classList.toggle('oculto', x !== v)); $('btnSalir').classList.toggle('oculto', v === 'vLogin'); }
 
@@ -68,7 +73,7 @@
         arrancar();
       } catch (e) { $('errLogin').textContent = e.message; }
     };
-    $('btnSalir').onclick = () => { pararGps(); S.borrar(); ver('vLogin'); };
+    $('btnSalir').onclick = () => { pararGps(); S.borrar(); if (marca) { marca.remove(); marca = null; } ver('vLogin'); };
 
     $('btnAceptar').onclick = async () => { await api('/api/conductor/aceptar-aviso', {}, S.token()); arrancar(); };
 
@@ -86,7 +91,7 @@
       $('camion').innerHTML = est.camiones.map(c => `<option value="${c.id}">${esc(c.matricula)} ${esc(c.descripcion)}</option>`).join('');
       if (!mapa) {
         mapa = crearMapa('mapa');
-        linea = L.polyline([], { color: '#e8710a', weight: 5 }).addTo(mapa);
+        linea = L.polyline([], { color: '#0a4d9c', weight: 6, opacity: .85 }).addTo(mapa);
       }
       pintarEstado(est.jornada);
       if (est.jornada) iniciarGps();
@@ -96,8 +101,9 @@
     function pintarEstado(j) {
       $('bloqueInicio').classList.toggle('oculto', !!j);
       $('bloqueFin').classList.toggle('oculto', !j);
+      matActual = j ? j.matricula : '';
       $('estado').className = 'estado ' + (j ? 'on' : 'off');
-      $('estado').textContent = j ? `Jornada activa · ${j.matricula} · ubicación registrándose` : 'Sin jornada · ubicación desactivada';
+      $('estado').textContent = j ? `En ruta con ${j.matricula}: registrando ubicación` : 'Sin jornada: ubicación desactivada';
     }
 
     $('btnIniciar').onclick = async () => {
@@ -125,10 +131,10 @@
         cola.push(punto);
         const ll = [punto.lat, punto.lng];
         linea.addLatLng(ll);
-        if (!marca) marca = L.marker(ll).addTo(mapa); else marca.setLatLng(ll);
+        if (!marca) marca = L.marker(ll, { icon: iconoCamion(matActual) }).addTo(mapa); else marca.setLatLng(ll);
         mapa.setView(ll, Math.max(mapa.getZoom(), 15));
-        $('infoGps').textContent = `Precisión ±${Math.round(punto.precision)} m` + (punto.velocidad != null ? ` · ${punto.velocidad} km/h` : '') + ` · pendientes de enviar: ${cola.length}`;
-      }, err => { $('infoGps').textContent = 'Error de GPS: ' + err.message; },
+        $('infoGps').textContent = `Precisión de ${Math.round(punto.precision)} m` + (punto.velocidad != null ? `, ${punto.velocidad} km/h` : '') + (cola.length > 1 ? `. ${cola.length} puntos esperando cobertura.` : '.');
+      }, err => { $('infoGps').textContent = ({ 1: 'No hay permiso de ubicación. Actívalo para esta web en los ajustes del navegador.', 2: 'No hay señal GPS. Comprueba que la ubicación del móvil está encendida.', 3: 'El GPS está tardando en responder. Seguimos intentándolo.' })[err.code] || 'Error de GPS.'; },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
     }
     function pararGps() { if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; }
@@ -144,7 +150,7 @@
 
     async function cargarMisJornadas() {
       const js = await api('/api/conductor/mis-jornadas', null, S.token());
-      $('misJornadas').innerHTML = js.map(j => `<tr><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${esc(j.matricula)}</td><td>${j.puntos}</td></tr>`).join('')
+      $('misJornadas').innerHTML = js.map(j => `<tr><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${placa(j.matricula)}</td><td>${j.puntos}</td></tr>`).join('')
         || '<tr><td colspan="4" class="nota">Aún no hay jornadas</td></tr>';
     }
 

@@ -4,11 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GPS Flota · Empresa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&display=swap">
+  <meta name="theme-color" content="#23272b">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
-  <header><h1>GPS <span>Flota</span> · <span id="nombreEmpresa" style="color:inherit">Empresa</span></h1>
+  <header><a class="marca" href="/"><img src="icono.svg" alt="" width="30" height="30"><h1>GPS Flota<small id="nombreEmpresa">Empresa</small></h1></a>
     <button class="sec oculto" id="btnSalir">Salir</button></header>
   <main>
     <!-- Acceso -->
@@ -45,7 +49,7 @@
         <div class="tarjeta fila">
           <div><label>Día</label><input type="date" id="hFecha"></div>
           <div><label>Camión</label><select id="hCamion"></select></div>
-          <div style="flex:0 0 auto"><button id="btnVerRuta">Ver rutas</button></div>
+          <div class="ajustado"><button id="btnVerRuta">Ver rutas</button></div>
         </div>
         <div id="mapaHistorial" class="mapa"></div>
         <div class="tarjeta" style="margin-top:16px">
@@ -60,7 +64,7 @@
           <div class="fila">
             <div><label>Matrícula</label><input id="nMatricula" placeholder="1234ABC"></div>
             <div><label>Descripción</label><input id="nDesc" placeholder="Volvo FH tráiler"></div>
-            <div style="flex:0 0 auto"><button id="btnCamion">Añadir</button></div>
+            <div class="ajustado"><button id="btnCamion">Añadir</button></div>
           </div>
           <table style="margin-top:12px"><tbody id="listaCamiones"></tbody></table>
         </div>
@@ -69,9 +73,9 @@
           <p class="nota">Al crear un conductor se genera un código y un PIN. Entrégaselos junto con la información sobre la geolocalización: el PIN no se vuelve a mostrar.</p>
           <div class="fila">
             <div><label>Nombre</label><input id="nConductor"></div>
-            <div style="flex:0 0 auto"><button id="btnConductor">Añadir</button></div>
+            <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
-          <p id="nuevoPin" class="oculto tarjeta" style="margin-top:12px"></p>
+          <div id="nuevoPin" class="oculto credenciales"></div>
           <table style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Aviso leído</th></tr></thead>
             <tbody id="listaConductores"></tbody></table>
         </div>
@@ -127,11 +131,11 @@
       lista.forEach(c => {
         if (c.lat == null) return;
         puntos.push([c.lat, c.lng]);
-        L.marker([c.lat, c.lng]).addTo(capaD).bindPopup(
-          `<b>${esc(c.matricula)}</b><br>${esc(c.conductor)}<br>${c.velocidad != null ? c.velocidad + ' km/h<br>' : ''}Última señal: ${fecha(c.ts)}`);
+        L.marker([c.lat, c.lng], { icon: iconoCamion(c.matricula) }).addTo(capaD).bindPopup(
+          `${placa(c.matricula)}<br><b>${esc(c.conductor)}</b><br>${c.velocidad != null ? c.velocidad + ' km/h<br>' : ''}Última señal: ${fecha(c.ts)}`);
       });
       $('resumenDirecto').textContent = lista.length
-        ? `${lista.length} camión(es) en jornada · se actualiza cada 15 s` : 'Ningún camión tiene la jornada iniciada ahora mismo.';
+        ? `${lista.length === 1 ? '1 camión en ruta' : lista.length + ' camiones en ruta'}. El mapa se actualiza cada 15 segundos.` : 'Ningún camión está en ruta ahora mismo. Aparecerán aquí cuando un conductor inicie su jornada.';
       if (puntos.length && primeraVez) { mapaD.fitBounds(puntos, { maxZoom: 13, padding: [40, 40] }); primeraVez = false; }
     }
 
@@ -147,7 +151,7 @@
       return d.toFixed(1);
     }
 
-    const colores = ['#e8710a', '#1f77b4', '#2ca02c', '#9467bd', '#d62728', '#17becf'];
+    const colores = ['#0a4d9c', '#d98a00', '#1e8a4c', '#7b3fa0', '#c8322b', '#0f8a95'];
     $('btnVerRuta').onclick = async () => {
       const q = new URLSearchParams({ fecha: $('hFecha').value });
       if ($('hCamion').value) q.set('camion_id', $('hCamion').value);
@@ -159,18 +163,18 @@
         if (!ll.length) return;
         todos.push(...ll);
         L.polyline(ll, { color: colores[i % colores.length], weight: 5 }).addTo(capaH).bindPopup(`${esc(j.matricula)} · ${esc(j.conductor)}`);
-        L.circleMarker(ll[0], { radius: 7, color: '#1f8a4c', fillOpacity: 1 }).addTo(capaH).bindPopup('Inicio ' + fecha(j.puntos[0].ts));
-        L.circleMarker(ll[ll.length - 1], { radius: 7, color: '#c0392b', fillOpacity: 1 }).addTo(capaH).bindPopup('Último punto ' + fecha(j.puntos.at(-1).ts));
+        L.circleMarker(ll[0], { radius: 7, color: '#fff', weight: 3, fillColor: '#1e8a4c', fillOpacity: 1 }).addTo(capaH).bindPopup('Inicio ' + fecha(j.puntos[0].ts));
+        L.marker(ll[ll.length - 1], { icon: iconoCamion(j.matricula, false) }).addTo(capaH).bindPopup('Último punto ' + fecha(j.puntos.at(-1).ts));
       });
       if (todos.length) mapaH.fitBounds(todos, { padding: [30, 30] });
-      $('tablaHistorial').innerHTML = js.map(j => `<tr><td>${esc(j.matricula)}</td><td>${esc(j.conductor)}</td><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${km(j.puntos)}</td></tr>`).join('')
+      $('tablaHistorial').innerHTML = js.map(j => `<tr><td>${placa(j.matricula)}</td><td>${esc(j.conductor)}</td><td>${fecha(j.inicio)}</td><td>${j.fin ? fecha(j.fin) : 'En curso'}</td><td>${km(j.puntos)}</td></tr>`).join('')
         || '<tr><td colspan="5" class="nota">No hay rutas ese día</td></tr>';
     };
 
     async function cargarFlota() {
       camiones = await api('/api/empresa/camiones', null, tk());
       rellenarCamiones();
-      $('listaCamiones').innerHTML = camiones.map(c => `<tr><td><b>${esc(c.matricula)}</b></td><td>${esc(c.descripcion)}</td></tr>`).join('') || '<tr><td class="nota">Sin camiones</td></tr>';
+      $('listaCamiones').innerHTML = camiones.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td></tr>`).join('') || '<tr><td class="nota">Sin camiones</td></tr>';
       const cs = await api('/api/empresa/conductores', null, tk());
       $('listaConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td><td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td></tr>`).join('');
     }
@@ -181,7 +185,7 @@
     $('btnConductor').onclick = async () => {
       try {
         const r = await api('/api/empresa/conductores', { nombre: $('nConductor').value }, tk());
-        $('nuevoPin').innerHTML = `Conductor creado. Código: <code>${r.codigo}</code> · PIN: <code>${r.pin}</code><br><span class="nota">Apúntalo ahora; el PIN no se volverá a mostrar.</span>`;
+        $('nuevoPin').innerHTML = `<span>Código <code>${r.codigo}</code></span><span>PIN <code>${r.pin}</code></span><span>Entrégaselo al conductor ahora: el PIN no se vuelve a mostrar.</span>`;
         $('nuevoPin').classList.remove('oculto'); $('nConductor').value = ''; cargarFlota();
       } catch (e) { alert(e.message); }
     };

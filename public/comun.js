@@ -30,5 +30,18 @@ function crearMapa(id) {
   return m;
 }
 
+// Placa de matrícula española (franja azul con la E)
+const placa = m => `<span class="placa"><span>${esc(m)}</span></span>`;
+
+// Marcador de camión: círculo azul (amarillo si está en ruta) con la placa debajo
+const SVG_CAMION = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h11v9H2zM13 9h4l3 3.5V15h-7z" fill="#fff"/><circle cx="6" cy="16.5" r="2" fill="#fff"/><circle cx="16.5" cy="16.5" r="2" fill="#fff"/></svg>';
+function iconoCamion(matricula, activo = true) {
+  return L.divIcon({
+    className: 'marcador-camion' + (activo ? ' activo' : ''),
+    html: `<div class="cuerpo"><div class="icono">${SVG_CAMION}</div>${matricula ? placa(matricula) : ''}</div>`,
+    iconSize: [90, 64], iconAnchor: [45, 22], popupAnchor: [0, -24],
+  });
+}
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fecha = iso => new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });

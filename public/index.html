@@ -3,20 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Seguimiento de camiones para empresas de transporte: flota en directo e historial de rutas.">
+  <meta name="theme-color" content="#23272b">
   <title>GPS Flota</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&display=swap">
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
 </head>
 <body>
-  <header><h1>GPS <span>Flota</span></h1></header>
-  <main>
-    <p>Seguimiento de camiones para empresas de transporte.</p>
-    <div class="inicio">
-      <a href="conductor.html"><div class="tarjeta"><h2>Soy conductor</h2>
-        <p class="nota">Entra con el código y PIN que te ha dado tu empresa, elige tu camión e inicia la jornada.</p></div></a>
-      <a href="empresa.html"><div class="tarjeta"><h2>Soy empresa</h2>
-        <p class="nota">Registra tus camiones y conductores, mira la flota en directo y consulta las rutas.</p></div></a>
+  <header>
+    <a class="marca" href="/"><img src="icono.svg" alt="" width="30" height="30"><h1>GPS Flota</h1></a>
+  </header>
+  <main class="portada">
+    <section class="cartel" aria-label="Elige cómo entrar">
+      <div class="cartel-marco">
+        <h2>GPS Flota</h2>
+        <p class="lema">Dónde está cada camión y por dónde ha pasado, en tiempo real.</p>
+        <nav class="salidas">
+          <a class="salida" href="conductor.html">
+            <svg class="flecha" viewBox="0 0 44 44" aria-hidden="true"><path d="M8 22h22M22 12l10 10-10 10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="square"/></svg>
+            <div><b>Conductor</b><span>Entra con tu código y PIN e inicia la jornada</span></div>
+            <span class="panel-salida">Móvil</span>
+          </a>
+          <a class="salida" href="empresa.html">
+            <svg class="flecha" viewBox="0 0 44 44" aria-hidden="true"><path d="M8 22h22M22 12l10 10-10 10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="square"/></svg>
+            <div><b>Empresa</b><span>Tu flota en el mapa, rutas y conductores</span></div>
+            <span class="panel-salida">Oficina</span>
+          </a>
+        </nav>
+      </div>
+    </section>
+    <div class="pie-portada nota">
+      <span>La ubicación solo se registra durante la jornada que inicia el conductor.</span>
+      <a href="privacidad.html">Privacidad y aviso de geolocalización</a>
     </div>
-    <p class="nota"><a href="privacidad.html">Política de privacidad y aviso de geolocalización</a></p>
   </main>
 </body>
 </html>
