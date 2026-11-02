@@ -6,6 +6,8 @@ Funciona en **Cloudflare Workers** (servidor en `src/worker.js`) con la base de 
 
 ## Publicación
 
+Dirección: https://gps-flota.moritomatamoros03.workers.dev
+
 Cloudflare está conectado a este repositorio: cada `git push` a `main` publica la nueva versión automáticamente.
 
 Si cambias las tablas, actualiza `schema.sql` y ejecútalo en la base de datos real con `npm run db:remota`.
