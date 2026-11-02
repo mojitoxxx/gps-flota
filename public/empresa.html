@@ -67,7 +67,7 @@
             <div class="ajustado"><button id="btnCamion">Añadir</button></div>
           </div>
           <p class="nota">Elige qué conductor lleva cada camión. Cada conductor solo puede tener un camión asignado.</p>
-          <table style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th></tr></thead><tbody id="listaCamiones"></tbody></table>
+          <table style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th><th></th></tr></thead><tbody id="listaCamiones"></tbody></table>
           <p class="error" id="errAsignar"></p>
         </div>
         <div class="tarjeta">
@@ -78,8 +78,9 @@
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
-          <table style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th></tr></thead>
+          <table style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th><th></th></tr></thead>
             <tbody id="listaConductores"></tbody></table>
+          <p class="error" id="errConductores"></p>
         </div>
       </div>
     </section>
@@ -179,8 +180,9 @@
       const cs = await api('/api/empresa/conductores', null, tk());
       const opciones = sel => '<option value="">Sin conductor</option>' + cs.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nombre)}</option>`).join('');
       $('listaCamiones').innerHTML = camiones.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td>
-        <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td></tr>`).join('')
-        || '<tr><td colspan="3" class="nota">Añade tu primer camión con su matrícula.</td></tr>';
+        <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td>
+        <td class="acciones"><button class="quitar" data-tipo="camiones" data-id="${c.id}" data-nombre="el camión ${esc(c.matricula)}">Quitar</button></td></tr>`).join('')
+        || '<tr><td colspan="4" class="nota">Añade tu primer camión con su matrícula.</td></tr>';
       document.querySelectorAll('.asignar').forEach(s => s.onchange = async () => {
         $('errAsignar').textContent = '';
         try { await api('/api/empresa/asignar', { camion_id: Number(s.dataset.camion), conductor_id: s.value ? Number(s.value) : null }, tk()); }
@@ -190,8 +192,19 @@
       const camionDe = id => camiones.find(c => c.conductor_id === id);
       $('listaConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td>
         <td>${camionDe(c.id) ? placa(camionDe(c.id).matricula) : '<span class="nota">Sin asignar</span>'}</td>
-        <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td></tr>`).join('')
-        || '<tr><td colspan="4" class="nota">Añade a tus conductores para darles su código y PIN.</td></tr>';
+        <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
+        <td class="acciones"><button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
+        || '<tr><td colspan="5" class="nota">Añade a tus conductores para darles su código y PIN.</td></tr>';
+      document.querySelectorAll('.quitar').forEach(b => b.onclick = async () => {
+        const aviso = b.dataset.tipo === 'camiones'
+          ? `¿Quitar ${b.dataset.nombre}? También se borrará el historial de rutas de ese camión.`
+          : `¿Quitar ${b.dataset.nombre}? Ya no podrá entrar en la app y se borrará su historial de jornadas.`;
+        if (!confirm(aviso)) return;
+        $('errAsignar').textContent = ''; $('errConductores').textContent = '';
+        try { await api(`/api/empresa/${b.dataset.tipo}/quitar`, { id: Number(b.dataset.id) }, tk()); }
+        catch (err) { $(b.dataset.tipo === 'camiones' ? 'errAsignar' : 'errConductores').textContent = err.message; }
+        cargarFlota();
+      });
     }
     $('btnCamion').onclick = async () => {
       try { await api('/api/empresa/camiones', { matricula: $('nMatricula').value, descripcion: $('nDesc').value }, tk()); $('nMatricula').value = $('nDesc').value = ''; cargarFlota(); }

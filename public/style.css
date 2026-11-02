@@ -168,3 +168,14 @@ td select { padding: 7px 10px; min-width: 160px; }
 .descarga-app svg { width: 28px; height: 28px; flex: none; color: var(--ambar); }
 .descarga-app b { display: block; font-size: 1.05rem; }
 .descarga-app small { display: block; color: #b8c0c8; font-size: .88rem; }
+
+/* Botón de quitar en las tablas */
+td.acciones { text-align: right; width: 1%; white-space: nowrap; }
+button.quitar { background: transparent; color: var(--rojo); border: 1px solid color-mix(in srgb, var(--rojo) 45%, transparent); padding: 6px 12px; font-size: .9rem; }
+button.quitar:hover { background: var(--rojo); color: #fff; }
+@media (max-width: 640px) {
+  #listaCamiones td, #listaConductores td { display: block; border: 0; padding: 4px 0; text-align: left; width: auto; }
+  #listaCamiones tr, #listaConductores tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--borde); }
+  #pFlota thead { display: none; }
+  td select { width: 100%; }
+}

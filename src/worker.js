@@ -67,6 +67,36 @@ const rutas = {
       LEFT JOIN conductores co ON co.id = c.conductor_id
       WHERE c.empresa_id = ? ORDER BY c.matricula`).bind(uid).all()).results),
 
+  // Quitar un camión (y su historial de rutas)
+  'POST /api/empresa/camiones/quitar': async ({ db, uid, body }) => {
+    const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.id), uid).first();
+    if (!cam) return error('Camión no válido', 400);
+    if (await db.prepare('SELECT id FROM jornadas WHERE camion_id = ? AND fin IS NULL').bind(cam.id).first())
+      return error('Ese camión está en ruta. Espera a que el conductor finalice la jornada para quitarlo.', 409);
+    await db.batch([
+      db.prepare('DELETE FROM posiciones WHERE jornada_id IN (SELECT id FROM jornadas WHERE camion_id = ?)').bind(cam.id),
+      db.prepare('DELETE FROM jornadas WHERE camion_id = ?').bind(cam.id),
+      db.prepare('DELETE FROM camiones WHERE id = ?').bind(cam.id),
+    ]);
+    return json({ ok: true });
+  },
+
+  // Quitar un conductor (su acceso, sus jornadas y su asignación de camión)
+  'POST /api/empresa/conductores/quitar': async ({ db, uid, body }) => {
+    const co = await db.prepare('SELECT id FROM conductores WHERE id = ? AND empresa_id = ?').bind(Number(body.id), uid).first();
+    if (!co) return error('Conductor no válido', 400);
+    if (await db.prepare('SELECT id FROM jornadas WHERE conductor_id = ? AND fin IS NULL').bind(co.id).first())
+      return error('Ese conductor está en ruta. Espera a que finalice la jornada para quitarlo.', 409);
+    await db.batch([
+      db.prepare('UPDATE camiones SET conductor_id = NULL WHERE conductor_id = ?').bind(co.id),
+      db.prepare(`DELETE FROM sesiones WHERE tipo = 'conductor' AND ref_id = ?`).bind(co.id),
+      db.prepare('DELETE FROM posiciones WHERE jornada_id IN (SELECT id FROM jornadas WHERE conductor_id = ?)').bind(co.id),
+      db.prepare('DELETE FROM jornadas WHERE conductor_id = ?').bind(co.id),
+      db.prepare('DELETE FROM conductores WHERE id = ?').bind(co.id),
+    ]);
+    return json({ ok: true });
+  },
+
   // Asignar (o quitar, con conductor_id vacío) el conductor de un camión
   'POST /api/empresa/asignar': async ({ db, uid, body }) => {
     const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.camion_id), uid).first();
