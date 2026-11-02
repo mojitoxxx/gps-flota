@@ -176,6 +176,11 @@
         desasignar: (camion_id, conductor_id) => gestionar('POST desasignar', { camion_id, conductor_id }),
         quitar: (tipo, id) => gestionar(`POST ${tipo}/quitar`, { id }),
         error: (tipo, msg) => { $(tipo === 'camiones' ? 'errCamiones' : 'errConductores').textContent = msg; },
+        nuevoPin: id => gestionar('POST conductores/nuevo-pin', { id }),
+        mostrarPin: (nombre, codigo, pin) => {
+          $('nuevoPin').innerHTML = `<span><b>${esc(nombre)}</b></span><span>Código <code>${codigo}</code></span><span>PIN nuevo <code>${pin}</code></span><span>Entrégaselo al conductor ahora: no se vuelve a mostrar.</span>`;
+          $('nuevoPin').classList.remove('oculto'); $('nuevoPin').scrollIntoView({ block: 'center', behavior: 'smooth' });
+        },
         recargar: cargarDetalle,
       });
     }

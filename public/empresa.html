@@ -183,6 +183,11 @@
         desasignar: (camion_id, conductor_id) => api('/api/empresa/desasignar', { camion_id, conductor_id }, tk()),
         quitar: (tipo, id) => api(`/api/empresa/${tipo}/quitar`, { id }, tk()),
         error: (tipo, msg) => { $(tipo === 'camiones' ? 'errAsignar' : 'errConductores').textContent = msg; },
+        nuevoPin: id => api('/api/empresa/conductores/nuevo-pin', { id }, tk()),
+        mostrarPin: (nombre, codigo, pin) => {
+          $('nuevoPin').innerHTML = `<span><b>${esc(nombre)}</b></span><span>Código <code>${codigo}</code></span><span>PIN nuevo <code>${pin}</code></span><span>Entrégaselo al conductor ahora: no se vuelve a mostrar.</span>`;
+          $('nuevoPin').classList.remove('oculto'); $('nuevoPin').scrollIntoView({ block: 'center', behavior: 'smooth' });
+        },
         recargar: cargarFlota,
       });
     }

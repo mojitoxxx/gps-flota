@@ -44,7 +44,7 @@ function iconoCamion(matricula, activo = true) {
 }
 
 // Tablas de camiones y conductores (panel de empresa y panel de administrador).
-// acciones: { asignar(camionId, conductorId), desasignar(camionId, conductorId), quitar(tipo, id), error(tipo, mensaje), recargar() }
+// acciones: { asignar, desasignar, quitar(tipo, id), nuevoPin(id), mostrarPin(nombre, codigo, pin), error(tipo, mensaje), recargar() }
 function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
   tbodyCamiones.innerHTML = cams.map(c => {
     const ids = c.conductores.map(x => x.id);
@@ -60,7 +60,7 @@ function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
   tbodyConductores.innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td data-etiqueta="Código"><code>${c.codigo}</code></td>
       <td>${camionesDe(c.id).map(k => placa(k.matricula)).join(' ') || '<span class="nota">Sin camión</span>'}</td>
       <td data-etiqueta="Aviso leído">${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
-      <td class="acciones"><button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
+      <td class="acciones"><button class="sec nuevo-pin" data-id="${c.id}" data-nombre="${esc(c.nombre)}">Nuevo PIN</button> <button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
     || '<tr><td colspan="5" class="nota">Todavía no hay conductores. Añádelos para darles su código y PIN.</td></tr>';
 
   const intentar = async (tipo, fn) => { try { await fn(); } catch (e) { acciones.error(tipo, e.message); return; } acciones.recargar(); };
@@ -68,7 +68,12 @@ function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
     s.value && intentar('camiones', () => acciones.asignar(Number(s.dataset.camion), Number(s.value))));
   tbodyCamiones.querySelectorAll('button.desasignar').forEach(b => b.onclick = () =>
     intentar('camiones', () => acciones.desasignar(Number(b.dataset.camion), Number(b.dataset.conductor))));
-  [tbodyCamiones, tbodyConductores].forEach(t => t.querySelectorAll('button.quitar').forEach(b => b.onclick = () => {
+  tbodyConductores.querySelectorAll('button.nuevo-pin').forEach(b => b.onclick = async () => {
+    if (!confirm(`¿Generar un PIN nuevo para ${b.dataset.nombre}? El PIN anterior dejará de servir para entrar.`)) return;
+    try { const r = await acciones.nuevoPin(Number(b.dataset.id)); acciones.mostrarPin(b.dataset.nombre, r.codigo, r.pin); }
+    catch (e) { acciones.error('conductores', e.message); }
+  });
+    [tbodyCamiones, tbodyConductores].forEach(t => t.querySelectorAll('button.quitar').forEach(b => b.onclick = () => {
     const aviso = b.dataset.tipo === 'camiones'
       ? `¿Quitar ${b.dataset.nombre}? También se borrará el historial de rutas de ese camión.`
       : `¿Quitar ${b.dataset.nombre}? Ya no podrá entrar en la app y se borrará su historial de jornadas.`;

@@ -84,6 +84,15 @@ const rutas = {
     return json({ ok: true });
   },
 
+  // Generar un PIN nuevo para un conductor (el PIN se guarda cifrado y no se puede leer)
+  'POST /api/empresa/conductores/nuevo-pin': async ({ db, uid, body }) => {
+    const co = await db.prepare('SELECT id, codigo FROM conductores WHERE id = ? AND empresa_id = ?').bind(Number(body.id), uid).first();
+    if (!co) return error('Conductor no válido', 400);
+    const pin = String(aleatorio(100000, 1000000));
+    await db.prepare('UPDATE conductores SET pin_hash = ? WHERE id = ?').bind(await hash(pin), co.id).run();
+    return json({ codigo: co.codigo, pin }); // se muestra solo esta vez
+  },
+
   // Quitar un conductor (su acceso, sus jornadas y su asignación de camión)
   'POST /api/empresa/conductores/quitar': async ({ db, uid, body }) => {
     const co = await db.prepare('SELECT id FROM conductores WHERE id = ? AND empresa_id = ?').bind(Number(body.id), uid).first();
@@ -234,7 +243,8 @@ const rutas = {
   'POST /api/admin/gestionar': async (ctx) => {
     const { db, body } = ctx;
     const permitidas = ['GET camiones', 'GET conductores', 'POST camiones', 'POST conductores',
-      'POST asignar', 'POST desasignar', 'POST camiones/quitar', 'POST conductores/quitar'];
+      'POST asignar', 'POST desasignar', 'POST camiones/quitar', 'POST conductores/quitar',
+      'POST conductores/nuevo-pin'];
     if (!permitidas.includes(body.accion)) return error('Acción no permitida', 400);
     const e = await db.prepare('SELECT id FROM empresas WHERE id = ?').bind(Number(body.empresa_id)).first();
     if (!e) return error('Empresa no válida', 400);
