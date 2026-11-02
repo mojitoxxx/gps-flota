@@ -1,0 +1,13 @@
+{
+  "appId": "es.gpsflota.app",
+  "appName": "GPS Flota",
+  "webDir": "www",
+  "server": {
+    "url": "https://gps-flota.moritomatamoros03.workers.dev/conductor.html",
+    "cleartext": false,
+    "allowNavigation": ["gps-flota.moritomatamoros03.workers.dev"]
+  },
+  "android": {
+    "backgroundColor": "#23272b"
+  }
+}

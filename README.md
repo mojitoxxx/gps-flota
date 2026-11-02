@@ -56,3 +56,11 @@ Los textos `public/aviso-conductor.html` y `public/privacidad.html` son **borrad
 3. **App Android**: envolver la web con Capacitor y añadir un servicio en primer plano de ubicación, para que siga grabando con la pantalla apagada. Requiere la declaración de ubicación en segundo plano en Play Console.
 4. Mejoras: borrar conductores y camiones, exportar rutas, recuperar contraseña.
 5. Teselas de mapa: los servidores de OpenStreetMap no admiten uso intensivo. Con muchos usuarios hay que usar un proveedor de teselas (MapTiler, Stadia, etc.) o un servidor propio.
+
+## App Android (APK)
+
+La carpeta `android-app/` contiene la app de Android hecha con Capacitor: abre la pantalla del conductor de la web y pide permiso de ubicación.
+
+No hace falta instalar nada para compilarla. **GitHub Actions** (`.github/workflows/apk.yml`) la compila cada vez que cambia algo en `android-app/`, y deja el archivo en `public/gps-flota.apk`. Así se descarga desde el botón de la portada de la web. También se puede lanzar a mano desde la pestaña **Actions** del repositorio, con **Compilar APK → Run workflow**.
+
+Es una APK de prueba (firmada en modo debug): sirve para instalarla directamente en el móvil, pero no para subirla a Google Play. Para Play hace falta una versión firmada (AAB) y la grabación de la ubicación con la pantalla apagada.

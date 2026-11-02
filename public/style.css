@@ -157,3 +157,14 @@ code { background: var(--fondo); padding: 2px 6px; border-radius: 4px; font-size
 button:disabled { background: var(--borde); color: var(--suave); cursor: not-allowed; }
 td select { padding: 7px 10px; min-width: 160px; }
 #miCamion { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; font-weight: 700; }
+
+/* Botón de descarga de la app */
+.descarga-app {
+  display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 14px 18px;
+  background: var(--asfalto); color: #fff; text-decoration: none; border-radius: var(--radio);
+  border-left: 6px solid var(--ambar);
+}
+.descarga-app:hover { background: var(--asfalto-2); }
+.descarga-app svg { width: 28px; height: 28px; flex: none; color: var(--ambar); }
+.descarga-app b { display: block; font-size: 1.05rem; }
+.descarga-app small { display: block; color: #b8c0c8; font-size: .88rem; }

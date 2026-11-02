@@ -1,0 +1,70 @@
+# Compila la app Android (APK) y la deja en public/gps-flota.apk,
+# para que se pueda descargar desde la web.
+name: Compilar APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/apk.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: android-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Crear el proyecto Android
+        working-directory: android-app
+        run: |
+          npm ci
+          npx cap add android
+          npx capacitor-assets generate --android || echo "No se pudieron generar los iconos; se usan los de serie"
+
+      - name: Permisos de ubicación
+        working-directory: android-app
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />#' $M
+          grep -q ACCESS_FINE_LOCATION $M
+          npx cap sync android
+
+      - name: Compilar
+        working-directory: android-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Guardar la APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: gps-flota-apk
+          path: android-app/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publicarla en la web
+        run: |
+          cp android-app/android/app/build/outputs/apk/debug/app-debug.apk public/gps-flota.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/gps-flota.apk
+          git commit -m "APK Android actualizada"
+          git pull --rebase origin main
+          git push origin HEAD:main
