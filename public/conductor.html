@@ -38,7 +38,7 @@
         <p class="nota" id="empresa" style="margin-top:-8px"></p>
         <p><span id="estado" class="estado off">Sin jornada: ubicación desactivada</span></p>
         <div id="bloqueInicio">
-          <label>Camión</label><select id="camion"></select>
+          <p id="miCamion"></p>
           <button class="grande" id="btnIniciar">Iniciar jornada</button>
         </div>
         <div id="bloqueFin" class="oculto">
@@ -88,7 +88,10 @@
       }
       ver('vJornada');
       $('nombre').textContent = S.datos().nombre; $('empresa').textContent = S.datos().empresa;
-      $('camion').innerHTML = est.camiones.map(c => `<option value="${c.id}">${esc(c.matricula)} ${esc(c.descripcion)}</option>`).join('');
+      $('miCamion').innerHTML = est.camion
+        ? `Tu camión: ${placa(est.camion.matricula)} <span class="nota">${esc(est.camion.descripcion)}</span>`
+        : '<span class="nota">Tu empresa todavía no te ha asignado un camión. Cuando lo haga, podrás iniciar la jornada.</span>';
+      $('btnIniciar').disabled = !est.camion;
       if (!mapa) {
         mapa = crearMapa('mapa');
         linea = L.polyline([], { color: '#0a4d9c', weight: 6, opacity: .85 }).addTo(mapa);
@@ -109,7 +112,7 @@
     $('btnIniciar').onclick = async () => {
       $('errJornada').textContent = '';
       try {
-        await api('/api/conductor/jornada/iniciar', { camion_id: Number($('camion').value) }, S.token());
+        await api('/api/conductor/jornada/iniciar', {}, S.token());
         linea.setLatLngs([]);
         arrancar();
       } catch (e) { $('errJornada').textContent = e.message; }

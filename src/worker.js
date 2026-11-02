@@ -63,7 +63,30 @@ const rutas = {
   },
 
   'GET /api/empresa/camiones': async ({ db, uid }) =>
-    json((await db.prepare('SELECT * FROM camiones WHERE empresa_id = ? ORDER BY matricula').bind(uid).all()).results),
+    json((await db.prepare(`SELECT c.*, co.nombre AS conductor FROM camiones c
+      LEFT JOIN conductores co ON co.id = c.conductor_id
+      WHERE c.empresa_id = ? ORDER BY c.matricula`).bind(uid).all()).results),
+
+  // Asignar (o quitar, con conductor_id vacío) el conductor de un camión
+  'POST /api/empresa/asignar': async ({ db, uid, body }) => {
+    const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.camion_id), uid).first();
+    if (!cam) return error('Camión no válido', 400);
+    const conductorId = body.conductor_id ? Number(body.conductor_id) : null;
+    if (conductorId) {
+      const co = await db.prepare('SELECT id FROM conductores WHERE id = ? AND empresa_id = ?').bind(conductorId, uid).first();
+      if (!co) return error('Conductor no válido', 400);
+      if (await db.prepare('SELECT id FROM jornadas WHERE conductor_id = ? AND fin IS NULL').bind(conductorId).first())
+        return error('Ese conductor está en ruta. Espera a que finalice la jornada para cambiarle el camión.', 409);
+    }
+    const ocupado = await db.prepare(`SELECT j.id FROM jornadas j WHERE j.camion_id = ? AND j.fin IS NULL`).bind(cam.id).first();
+    if (ocupado) return error('Ese camión está en ruta. Espera a que finalice la jornada para cambiar el conductor.', 409);
+    await db.batch([
+      // un conductor solo puede llevar un camión: se le quita del anterior
+      db.prepare('UPDATE camiones SET conductor_id = NULL WHERE conductor_id = ? AND empresa_id = ?').bind(conductorId, uid),
+      db.prepare('UPDATE camiones SET conductor_id = ? WHERE id = ?').bind(conductorId, cam.id),
+    ]);
+    return json({ ok: true });
+  },
 
   'POST /api/empresa/camiones': async ({ db, uid, body }) => {
     if (!body.matricula) return error('Falta la matrícula', 400);
@@ -129,19 +152,20 @@ const rutas = {
 
   'GET /api/conductor/estado': async ({ db, uid }) => {
     const yo = await db.prepare('SELECT empresa_id, aviso_aceptado FROM conductores WHERE id = ?').bind(uid).first();
-    const [camiones, jornada] = await db.batch([
-      db.prepare('SELECT id, matricula, descripcion FROM camiones WHERE empresa_id = ?').bind(yo.empresa_id),
+    const [camion, jornada] = await db.batch([
+      db.prepare('SELECT id, matricula, descripcion FROM camiones WHERE conductor_id = ?').bind(uid),
       db.prepare(`SELECT j.id, j.inicio, c.matricula FROM jornadas j JOIN camiones c ON c.id = j.camion_id
         WHERE j.conductor_id = ? AND j.fin IS NULL`).bind(uid),
     ]);
-    return json({ aviso_aceptado: yo.aviso_aceptado, camiones: camiones.results, jornada: jornada.results[0] || null });
+    return json({ aviso_aceptado: yo.aviso_aceptado, camion: camion.results[0] || null, jornada: jornada.results[0] || null });
   },
 
-  'POST /api/conductor/jornada/iniciar': async ({ db, uid, body }) => {
-    const yo = await db.prepare('SELECT empresa_id, aviso_aceptado FROM conductores WHERE id = ?').bind(uid).first();
+  'POST /api/conductor/jornada/iniciar': async ({ db, uid }) => {
+    const yo = await db.prepare('SELECT aviso_aceptado FROM conductores WHERE id = ?').bind(uid).first();
     if (!yo.aviso_aceptado) return error('Debes leer el aviso de geolocalización primero', 403);
-    const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.camion_id), yo.empresa_id).first();
-    if (!cam) return error('Camión no válido', 400);
+    // El camión es el que la empresa ha asignado al conductor
+    const cam = await db.prepare('SELECT id FROM camiones WHERE conductor_id = ?').bind(uid).first();
+    if (!cam) return error('Tu empresa todavía no te ha asignado un camión.', 409);
     if (await db.prepare('SELECT id FROM jornadas WHERE conductor_id = ? AND fin IS NULL').bind(uid).first())
       return error('Ya tienes una jornada abierta', 409);
     const r = await db.prepare('INSERT INTO jornadas (conductor_id, camion_id, inicio) VALUES (?,?,?)').bind(uid, cam.id, ahora()).run();

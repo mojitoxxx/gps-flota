@@ -66,7 +66,9 @@
             <div><label>Descripción</label><input id="nDesc" placeholder="Volvo FH tráiler"></div>
             <div class="ajustado"><button id="btnCamion">Añadir</button></div>
           </div>
-          <table style="margin-top:12px"><tbody id="listaCamiones"></tbody></table>
+          <p class="nota">Elige qué conductor lleva cada camión. Cada conductor solo puede tener un camión asignado.</p>
+          <table style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th></tr></thead><tbody id="listaCamiones"></tbody></table>
+          <p class="error" id="errAsignar"></p>
         </div>
         <div class="tarjeta">
           <h2>Conductores</h2>
@@ -76,7 +78,7 @@
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
-          <table style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Aviso leído</th></tr></thead>
+          <table style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th></tr></thead>
             <tbody id="listaConductores"></tbody></table>
         </div>
       </div>
@@ -174,9 +176,22 @@
     async function cargarFlota() {
       camiones = await api('/api/empresa/camiones', null, tk());
       rellenarCamiones();
-      $('listaCamiones').innerHTML = camiones.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td></tr>`).join('') || '<tr><td class="nota">Sin camiones</td></tr>';
       const cs = await api('/api/empresa/conductores', null, tk());
-      $('listaConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td><td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td></tr>`).join('');
+      const opciones = sel => '<option value="">Sin conductor</option>' + cs.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nombre)}</option>`).join('');
+      $('listaCamiones').innerHTML = camiones.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td>
+        <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td></tr>`).join('')
+        || '<tr><td colspan="3" class="nota">Añade tu primer camión con su matrícula.</td></tr>';
+      document.querySelectorAll('.asignar').forEach(s => s.onchange = async () => {
+        $('errAsignar').textContent = '';
+        try { await api('/api/empresa/asignar', { camion_id: Number(s.dataset.camion), conductor_id: s.value ? Number(s.value) : null }, tk()); }
+        catch (err) { $('errAsignar').textContent = err.message; }
+        cargarFlota();
+      });
+      const camionDe = id => camiones.find(c => c.conductor_id === id);
+      $('listaConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td>
+        <td>${camionDe(c.id) ? placa(camionDe(c.id).matricula) : '<span class="nota">Sin asignar</span>'}</td>
+        <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td></tr>`).join('')
+        || '<tr><td colspan="4" class="nota">Añade a tus conductores para darles su código y PIN.</td></tr>';
     }
     $('btnCamion').onclick = async () => {
       try { await api('/api/empresa/camiones', { matricula: $('nMatricula').value, descripcion: $('nDesc').value }, tk()); $('nMatricula').value = $('nDesc').value = ''; cargarFlota(); }

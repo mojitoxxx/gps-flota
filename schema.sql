@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS empresas (
   pass_hash TEXT NOT NULL, creado TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS camiones (
   id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
-  matricula TEXT NOT NULL, descripcion TEXT DEFAULT '');
+  matricula TEXT NOT NULL, descripcion TEXT DEFAULT '',
+  conductor_id INTEGER REFERENCES conductores(id) ON DELETE SET NULL);
 CREATE TABLE IF NOT EXISTS conductores (
   id INTEGER PRIMARY KEY, empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL, codigo TEXT UNIQUE NOT NULL, pin_hash TEXT NOT NULL, aviso_aceptado TEXT);
@@ -18,3 +19,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_jornada ON posiciones(jornada_id, ts);
 CREATE TABLE IF NOT EXISTS sesiones (
   token TEXT PRIMARY KEY, tipo TEXT NOT NULL, ref_id INTEGER NOT NULL,
   creado TEXT DEFAULT (datetime('now')));
+
+-- Conductor asignado a cada camión (un conductor solo puede tener un camión)
+-- En una base de datos ya creada: ALTER TABLE camiones ADD COLUMN conductor_id INTEGER REFERENCES conductores(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_camion_conductor ON camiones(conductor_id) WHERE conductor_id IS NOT NULL;
