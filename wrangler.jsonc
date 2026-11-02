@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gps-flota",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gps-flota-db",
+      "database_id": "a561c711-4f5b-488f-a535-d7672372d1bf"
+    }
+  ],
+  "vars": {
+    "RETENCION_DIAS": "90"
+  },
+  "triggers": {
+    "crons": ["0 */6 * * *"]
+  },
+  "observability": { "enabled": true }
+}
