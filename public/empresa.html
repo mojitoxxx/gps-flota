@@ -66,8 +66,8 @@
             <div><label>Descripción</label><input id="nDesc" placeholder="Volvo FH tráiler"></div>
             <div class="ajustado"><button id="btnCamion">Añadir</button></div>
           </div>
-          <p class="nota">Elige qué conductor lleva cada camión. Cada conductor solo puede tener un camión asignado.</p>
-          <table class="apilada" style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th><th></th></tr></thead><tbody id="listaCamiones"></tbody></table>
+          <p class="nota">Asigna a cada camión los conductores que pueden llevarlo. Un camión puede tener varios conductores, pero solo uno puede estar en ruta con él a la vez.</p>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductores</th><th></th></tr></thead><tbody id="listaCamiones"></tbody></table>
           <p class="error" id="errAsignar"></p>
         </div>
         <div class="tarjeta">
@@ -78,7 +78,7 @@
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
-          <table class="apilada" style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th><th></th></tr></thead>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camiones</th><th>Aviso leído</th><th></th></tr></thead>
             <tbody id="listaConductores"></tbody></table>
           <p class="error" id="errConductores"></p>
         </div>
@@ -175,35 +175,15 @@
     };
 
     async function cargarFlota() {
-      camiones = await api('/api/empresa/camiones', null, tk());
-      rellenarCamiones();
-      const cs = await api('/api/empresa/conductores', null, tk());
-      const opciones = sel => '<option value="">Sin conductor</option>' + cs.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nombre)}</option>`).join('');
-      $('listaCamiones').innerHTML = camiones.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td>
-        <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td>
-        <td class="acciones"><button class="quitar" data-tipo="camiones" data-id="${c.id}" data-nombre="el camión ${esc(c.matricula)}">Quitar</button></td></tr>`).join('')
-        || '<tr><td colspan="4" class="nota">Añade tu primer camión con su matrícula.</td></tr>';
-      document.querySelectorAll('.asignar').forEach(s => s.onchange = async () => {
-        $('errAsignar').textContent = '';
-        try { await api('/api/empresa/asignar', { camion_id: Number(s.dataset.camion), conductor_id: s.value ? Number(s.value) : null }, tk()); }
-        catch (err) { $('errAsignar').textContent = err.message; }
-        cargarFlota();
-      });
-      const camionDe = id => camiones.find(c => c.conductor_id === id);
-      $('listaConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td>
-        <td>${camionDe(c.id) ? placa(camionDe(c.id).matricula) : '<span class="nota">Sin asignar</span>'}</td>
-        <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
-        <td class="acciones"><button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
-        || '<tr><td colspan="5" class="nota">Añade a tus conductores para darles su código y PIN.</td></tr>';
-      document.querySelectorAll('.quitar').forEach(b => b.onclick = async () => {
-        const aviso = b.dataset.tipo === 'camiones'
-          ? `¿Quitar ${b.dataset.nombre}? También se borrará el historial de rutas de ese camión.`
-          : `¿Quitar ${b.dataset.nombre}? Ya no podrá entrar en la app y se borrará su historial de jornadas.`;
-        if (!confirm(aviso)) return;
-        $('errAsignar').textContent = ''; $('errConductores').textContent = '';
-        try { await api(`/api/empresa/${b.dataset.tipo}/quitar`, { id: Number(b.dataset.id) }, tk()); }
-        catch (err) { $(b.dataset.tipo === 'camiones' ? 'errAsignar' : 'errConductores').textContent = err.message; }
-        cargarFlota();
+      $('errAsignar').textContent = $('errConductores').textContent = '';
+      const [cams, cs] = await Promise.all([api('/api/empresa/camiones', null, tk()), api('/api/empresa/conductores', null, tk())]);
+      camiones = cams; rellenarCamiones();
+      pintarFlota(cams, cs, $('listaCamiones'), $('listaConductores'), {
+        asignar: (camion_id, conductor_id) => api('/api/empresa/asignar', { camion_id, conductor_id }, tk()),
+        desasignar: (camion_id, conductor_id) => api('/api/empresa/desasignar', { camion_id, conductor_id }, tk()),
+        quitar: (tipo, id) => api(`/api/empresa/${tipo}/quitar`, { id }, tk()),
+        error: (tipo, msg) => { $(tipo === 'camiones' ? 'errAsignar' : 'errConductores').textContent = msg; },
+        recargar: cargarFlota,
       });
     }
     $('btnCamion').onclick = async () => {

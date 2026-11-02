@@ -183,3 +183,11 @@ td.acciones button { padding: 6px 12px; font-size: .9rem; }
   table.apilada td.acciones { padding-top: 8px; }
   td select { width: 100%; }
 }
+
+/* Conductores de un camión */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 2px; background: color-mix(in srgb, var(--cartel) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--cartel) 30%, transparent); border-radius: 99px; padding: 3px 4px 3px 12px; font-size: .92rem; font-weight: 600; }
+.chip button { background: transparent; color: var(--suave); padding: 0 8px; font-size: 1.1rem; line-height: 1.2; border-radius: 99px; }
+.chip button:hover { background: var(--rojo); color: #fff; }
+.chips select { width: auto; min-width: 170px; padding: 6px 10px; }
+#miCamion select { width: 100%; }

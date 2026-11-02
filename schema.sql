@@ -28,3 +28,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_camion_conductor ON camiones(conductor_id)
 CREATE TABLE IF NOT EXISTS admins (
   id INTEGER PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, pass_hash TEXT NOT NULL,
   creado TEXT DEFAULT (datetime('now')));
+
+-- Conductores asignados a cada camión (varios por camión). Sustituye a camiones.conductor_id,
+-- que se mantiene solo por compatibilidad con bases de datos antiguas.
+DROP INDEX IF EXISTS idx_camion_conductor;
+CREATE TABLE IF NOT EXISTS asignaciones (
+  camion_id INTEGER NOT NULL REFERENCES camiones(id) ON DELETE CASCADE,
+  conductor_id INTEGER NOT NULL REFERENCES conductores(id) ON DELETE CASCADE,
+  PRIMARY KEY (camion_id, conductor_id));
+CREATE INDEX IF NOT EXISTS idx_asig_conductor ON asignaciones(conductor_id);

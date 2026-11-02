@@ -88,10 +88,17 @@
       }
       ver('vJornada');
       $('nombre').textContent = S.datos().nombre; $('empresa').textContent = S.datos().empresa;
-      $('miCamion').innerHTML = est.camion
-        ? `Tu camión: ${placa(est.camion.matricula)} <span class="nota">${esc(est.camion.descripcion)}</span>`
-        : '<span class="nota">Tu empresa todavía no te ha asignado un camión. Cuando lo haga, podrás iniciar la jornada.</span>';
-      $('btnIniciar').disabled = !est.camion;
+      const cams = est.camiones || [];
+      if (cams.length === 1) {
+        $('miCamion').innerHTML = `Tu camión: ${placa(cams[0].matricula)} <span class="nota">${esc(cams[0].descripcion)}</span>`
+          + (cams[0].en_ruta ? '<span class="nota">Ahora está en ruta con otro conductor.</span>' : '');
+      } else if (cams.length > 1) {
+        $('miCamion').innerHTML = `<label for="camion" style="width:100%;margin:0">¿Con qué camión sales hoy?</label>
+          <select id="camion">${cams.map(k => `<option value="${k.id}"${k.en_ruta ? ' disabled' : ''}>${esc(k.matricula)} ${esc(k.descripcion)}${k.en_ruta ? ' (en ruta con otro conductor)' : ''}</option>`).join('')}</select>`;
+      } else {
+        $('miCamion').innerHTML = '<span class="nota">Tu empresa todavía no te ha asignado un camión. Cuando lo haga, podrás iniciar la jornada.</span>';
+      }
+      $('btnIniciar').disabled = !cams.some(k => !k.en_ruta);
       if (!mapa) {
         mapa = crearMapa('mapa');
         linea = L.polyline([], { color: '#0a4d9c', weight: 6, opacity: .85 }).addTo(mapa);
@@ -112,7 +119,7 @@
     $('btnIniciar').onclick = async () => {
       $('errJornada').textContent = '';
       try {
-        await api('/api/conductor/jornada/iniciar', {}, S.token());
+        await api('/api/conductor/jornada/iniciar', $('camion') ? { camion_id: Number($('camion').value) } : {}, S.token());
         linea.setLatLngs([]);
         arrancar();
       } catch (e) { $('errJornada').textContent = e.message; }

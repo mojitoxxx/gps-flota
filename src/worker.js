@@ -63,9 +63,11 @@ const rutas = {
   },
 
   'GET /api/empresa/camiones': async ({ db, uid }) =>
-    json((await db.prepare(`SELECT c.*, co.nombre AS conductor FROM camiones c
-      LEFT JOIN conductores co ON co.id = c.conductor_id
-      WHERE c.empresa_id = ? ORDER BY c.matricula`).bind(uid).all()).results),
+    json((await db.prepare(`SELECT c.id, c.matricula, c.descripcion,
+      (SELECT json_group_array(json_object('id', co.id, 'nombre', co.nombre)) FROM asignaciones a
+        JOIN conductores co ON co.id = a.conductor_id WHERE a.camion_id = c.id) AS conductores
+      FROM camiones c WHERE c.empresa_id = ? ORDER BY c.matricula`).bind(uid).all()).results
+      .map(c => ({ ...c, conductores: JSON.parse(c.conductores || '[]').sort((x, y) => x.nombre.localeCompare(y.nombre)) }))),
 
   // Quitar un camión (y su historial de rutas)
   'POST /api/empresa/camiones/quitar': async ({ db, uid, body }) => {
@@ -76,6 +78,7 @@ const rutas = {
     await db.batch([
       db.prepare('DELETE FROM posiciones WHERE jornada_id IN (SELECT id FROM jornadas WHERE camion_id = ?)').bind(cam.id),
       db.prepare('DELETE FROM jornadas WHERE camion_id = ?').bind(cam.id),
+      db.prepare('DELETE FROM asignaciones WHERE camion_id = ?').bind(cam.id),
       db.prepare('DELETE FROM camiones WHERE id = ?').bind(cam.id),
     ]);
     return json({ ok: true });
@@ -89,6 +92,7 @@ const rutas = {
       return error('Ese conductor está en ruta. Espera a que finalice la jornada para quitarlo.', 409);
     await db.batch([
       db.prepare('UPDATE camiones SET conductor_id = NULL WHERE conductor_id = ?').bind(co.id),
+      db.prepare('DELETE FROM asignaciones WHERE conductor_id = ?').bind(co.id),
       db.prepare(`DELETE FROM sesiones WHERE tipo = 'conductor' AND ref_id = ?`).bind(co.id),
       db.prepare('DELETE FROM posiciones WHERE jornada_id IN (SELECT id FROM jornadas WHERE conductor_id = ?)').bind(co.id),
       db.prepare('DELETE FROM jornadas WHERE conductor_id = ?').bind(co.id),
@@ -97,23 +101,26 @@ const rutas = {
     return json({ ok: true });
   },
 
-  // Asignar (o quitar, con conductor_id vacío) el conductor de un camión
+  // Añadir un conductor a un camión (un camión puede tener varios conductores)
   'POST /api/empresa/asignar': async ({ db, uid, body }) => {
     const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.camion_id), uid).first();
     if (!cam) return error('Camión no válido', 400);
-    const conductorId = body.conductor_id ? Number(body.conductor_id) : null;
-    if (conductorId) {
-      const co = await db.prepare('SELECT id FROM conductores WHERE id = ? AND empresa_id = ?').bind(conductorId, uid).first();
-      if (!co) return error('Conductor no válido', 400);
-      if (await db.prepare('SELECT id FROM jornadas WHERE conductor_id = ? AND fin IS NULL').bind(conductorId).first())
-        return error('Ese conductor está en ruta. Espera a que finalice la jornada para cambiarle el camión.', 409);
-    }
-    const ocupado = await db.prepare(`SELECT j.id FROM jornadas j WHERE j.camion_id = ? AND j.fin IS NULL`).bind(cam.id).first();
-    if (ocupado) return error('Ese camión está en ruta. Espera a que finalice la jornada para cambiar el conductor.', 409);
+    const co = await db.prepare('SELECT id FROM conductores WHERE id = ? AND empresa_id = ?').bind(Number(body.conductor_id), uid).first();
+    if (!co) return error('Conductor no válido', 400);
+    await db.prepare('INSERT OR IGNORE INTO asignaciones (camion_id, conductor_id) VALUES (?,?)').bind(cam.id, co.id).run();
+    return json({ ok: true });
+  },
+
+  // Quitar a un conductor de un camión
+  'POST /api/empresa/desasignar': async ({ db, uid, body }) => {
+    const cam = await db.prepare('SELECT id FROM camiones WHERE id = ? AND empresa_id = ?').bind(Number(body.camion_id), uid).first();
+    if (!cam) return error('Camión no válido', 400);
+    const conductorId = Number(body.conductor_id);
+    if (await db.prepare('SELECT id FROM jornadas WHERE camion_id = ? AND conductor_id = ? AND fin IS NULL').bind(cam.id, conductorId).first())
+      return error('Ese conductor está en ruta con este camión. Espera a que finalice la jornada.', 409);
     await db.batch([
-      // un conductor solo puede llevar un camión: se le quita del anterior
-      db.prepare('UPDATE camiones SET conductor_id = NULL WHERE conductor_id = ? AND empresa_id = ?').bind(conductorId, uid),
-      db.prepare('UPDATE camiones SET conductor_id = ? WHERE id = ?').bind(conductorId, cam.id),
+      db.prepare('DELETE FROM asignaciones WHERE camion_id = ? AND conductor_id = ?').bind(cam.id, conductorId),
+      db.prepare('UPDATE camiones SET conductor_id = NULL WHERE id = ? AND conductor_id = ?').bind(cam.id, conductorId),
     ]);
     return json({ ok: true });
   },
@@ -204,6 +211,7 @@ const rutas = {
       db.prepare('DELETE FROM jornadas WHERE camion_id IN (SELECT id FROM camiones WHERE empresa_id = ?)').bind(e.id),
       db.prepare(`DELETE FROM sesiones WHERE tipo = 'conductor' AND ref_id IN (SELECT id FROM conductores WHERE empresa_id = ?)`).bind(e.id),
       db.prepare(`DELETE FROM sesiones WHERE tipo = 'empresa' AND ref_id = ?`).bind(e.id),
+      db.prepare('DELETE FROM asignaciones WHERE camion_id IN (SELECT id FROM camiones WHERE empresa_id = ?)').bind(e.id),
       db.prepare('UPDATE camiones SET conductor_id = NULL WHERE empresa_id = ?').bind(e.id),
       db.prepare('DELETE FROM conductores WHERE empresa_id = ?').bind(e.id),
       db.prepare('DELETE FROM camiones WHERE empresa_id = ?').bind(e.id),
@@ -226,7 +234,7 @@ const rutas = {
   'POST /api/admin/gestionar': async (ctx) => {
     const { db, body } = ctx;
     const permitidas = ['GET camiones', 'GET conductores', 'POST camiones', 'POST conductores',
-      'POST asignar', 'POST camiones/quitar', 'POST conductores/quitar'];
+      'POST asignar', 'POST desasignar', 'POST camiones/quitar', 'POST conductores/quitar'];
     if (!permitidas.includes(body.accion)) return error('Acción no permitida', 400);
     const e = await db.prepare('SELECT id FROM empresas WHERE id = ?').bind(Number(body.empresa_id)).first();
     if (!e) return error('Empresa no válida', 400);
@@ -250,20 +258,26 @@ const rutas = {
 
   'GET /api/conductor/estado': async ({ db, uid }) => {
     const yo = await db.prepare('SELECT empresa_id, aviso_aceptado FROM conductores WHERE id = ?').bind(uid).first();
-    const [camion, jornada] = await db.batch([
-      db.prepare('SELECT id, matricula, descripcion FROM camiones WHERE conductor_id = ?').bind(uid),
+    const [camiones, jornada] = await db.batch([
+      db.prepare(`SELECT c.id, c.matricula, c.descripcion,
+        EXISTS (SELECT 1 FROM jornadas j WHERE j.camion_id = c.id AND j.fin IS NULL) AS en_ruta
+        FROM asignaciones a JOIN camiones c ON c.id = a.camion_id WHERE a.conductor_id = ? ORDER BY c.matricula`).bind(uid),
       db.prepare(`SELECT j.id, j.inicio, c.matricula FROM jornadas j JOIN camiones c ON c.id = j.camion_id
         WHERE j.conductor_id = ? AND j.fin IS NULL`).bind(uid),
     ]);
-    return json({ aviso_aceptado: yo.aviso_aceptado, camion: camion.results[0] || null, jornada: jornada.results[0] || null });
+    return json({ aviso_aceptado: yo.aviso_aceptado, camiones: camiones.results, jornada: jornada.results[0] || null });
   },
 
-  'POST /api/conductor/jornada/iniciar': async ({ db, uid }) => {
+  'POST /api/conductor/jornada/iniciar': async ({ db, uid, body }) => {
     const yo = await db.prepare('SELECT aviso_aceptado FROM conductores WHERE id = ?').bind(uid).first();
     if (!yo.aviso_aceptado) return error('Debes leer el aviso de geolocalización primero', 403);
-    // El camión es el que la empresa ha asignado al conductor
-    const cam = await db.prepare('SELECT id FROM camiones WHERE conductor_id = ?').bind(uid).first();
-    if (!cam) return error('Tu empresa todavía no te ha asignado un camión.', 409);
+    // Solo puede salir con un camión que la empresa le haya asignado
+    const suyos = (await db.prepare('SELECT camion_id AS id FROM asignaciones WHERE conductor_id = ?').bind(uid).all()).results;
+    if (!suyos.length) return error('Tu empresa todavía no te ha asignado un camión.', 409);
+    const cam = body.camion_id ? suyos.find(c => c.id === Number(body.camion_id)) : (suyos.length === 1 ? suyos[0] : null);
+    if (!cam) return error('Elige uno de tus camiones asignados.', 400);
+    if (await db.prepare('SELECT id FROM jornadas WHERE camion_id = ? AND fin IS NULL').bind(cam.id).first())
+      return error('Ese camión ya está en ruta con otro conductor.', 409);
     if (await db.prepare('SELECT id FROM jornadas WHERE conductor_id = ? AND fin IS NULL').bind(uid).first())
       return error('Ya tienes una jornada abierta', 409);
     const r = await db.prepare('INSERT INTO jornadas (conductor_id, camion_id, inicio) VALUES (?,?,?)').bind(uid, cam.id, ahora()).run();

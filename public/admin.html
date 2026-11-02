@@ -66,7 +66,7 @@
             <div><label for="dDesc">Descripción</label><input id="dDesc"></div>
             <div class="ajustado"><button id="btnCamion">Añadir</button></div>
           </div>
-          <table class="apilada" style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th><th></th></tr></thead>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductores</th><th></th></tr></thead>
             <tbody id="detCamiones"></tbody></table>
           <p class="error" id="errCamiones"></p>
         </div>
@@ -77,7 +77,7 @@
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
-          <table class="apilada" style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th><th></th></tr></thead>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camiones</th><th>Aviso leído</th><th></th></tr></thead>
             <tbody id="detConductores"></tbody></table>
           <p class="error" id="errConductores"></p>
         </div>
@@ -171,30 +171,12 @@
     async function cargarDetalle() {
       $('errCamiones').textContent = $('errConductores').textContent = '';
       const [cams, cs] = await Promise.all([gestionar('GET camiones'), gestionar('GET conductores')]);
-      const opciones = sel => '<option value="">Sin conductor</option>' + cs.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nombre)}</option>`).join('');
-      $('detCamiones').innerHTML = cams.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td>
-          <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td>
-          <td class="acciones"><button class="quitar" data-accion="POST camiones/quitar" data-id="${c.id}" data-nombre="el camión ${esc(c.matricula)}">Quitar</button></td></tr>`).join('')
-        || '<tr><td colspan="4" class="nota">Esta empresa no tiene camiones.</td></tr>';
-      const camionDe = id => cams.find(c => c.conductor_id === id);
-      $('detConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td>
-          <td>${camionDe(c.id) ? placa(camionDe(c.id).matricula) : '<span class="nota">Sin asignar</span>'}</td>
-          <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
-          <td class="acciones"><button class="quitar" data-accion="POST conductores/quitar" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
-        || '<tr><td colspan="5" class="nota">Esta empresa no tiene conductores.</td></tr>';
-
-      document.querySelectorAll('#detCamiones .asignar').forEach(s => s.onchange = async () => {
-        try { await gestionar('POST asignar', { camion_id: Number(s.dataset.camion), conductor_id: s.value ? Number(s.value) : null }); }
-        catch (err) { $('errCamiones').textContent = err.message; }
-        cargarDetalle();
-      });
-      document.querySelectorAll('#pDetalle button.quitar').forEach(b => b.onclick = async () => {
-        const esCamion = b.dataset.accion.startsWith('POST camiones');
-        if (!confirm(esCamion ? `¿Quitar ${b.dataset.nombre}? También se borrará su historial de rutas.`
-                              : `¿Quitar ${b.dataset.nombre}? Ya no podrá entrar en la app y se borrará su historial de jornadas.`)) return;
-        try { await gestionar(b.dataset.accion, { id: Number(b.dataset.id) }); }
-        catch (err) { $(esCamion ? 'errCamiones' : 'errConductores').textContent = err.message; }
-        cargarDetalle();
+      pintarFlota(cams, cs, $('detCamiones'), $('detConductores'), {
+        asignar: (camion_id, conductor_id) => gestionar('POST asignar', { camion_id, conductor_id }),
+        desasignar: (camion_id, conductor_id) => gestionar('POST desasignar', { camion_id, conductor_id }),
+        quitar: (tipo, id) => gestionar(`POST ${tipo}/quitar`, { id }),
+        error: (tipo, msg) => { $(tipo === 'camiones' ? 'errCamiones' : 'errConductores').textContent = msg; },
+        recargar: cargarDetalle,
       });
     }
     $('btnCamion').onclick = async () => {
