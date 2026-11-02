@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>GPS Flota · Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&display=swap">
+  <meta name="theme-color" content="#23272b">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+  <header><a class="marca" href="/"><img src="icono.svg" alt="" width="30" height="30"><h1>GPS Flota<small>Administración</small></h1></a>
+    <button class="sec oculto" id="btnSalir">Salir</button></header>
+  <main>
+    <!-- Acceso -->
+    <section id="vAcceso" class="tarjeta" style="max-width:420px;margin:24px auto">
+      <h2>Acceso de administrador</h2>
+      <label for="aUsuario">Usuario</label><input id="aUsuario" autocomplete="username">
+      <label for="aPass">Contraseña</label><input id="aPass" type="password" autocomplete="current-password">
+      <p class="error" id="errA"></p>
+      <button class="grande" id="btnEntrar">Entrar</button>
+    </section>
+
+    <!-- Panel -->
+    <section id="vPanel" class="oculto">
+      <div class="pestanas">
+        <button data-p="pEmpresas" class="activa">Empresas</button>
+        <button data-p="pMapa">Mapa general</button>
+      </div>
+
+      <!-- Lista de empresas -->
+      <div id="pEmpresas">
+        <p class="nota" id="resumen"></p>
+        <div class="tarjeta">
+          <h2>Empresas registradas</h2>
+          <table class="apilada"><thead><tr><th>Empresa</th><th>Email</th><th>Alta</th><th>Camiones</th><th>Conductores</th><th>En ruta</th><th></th></tr></thead>
+            <tbody id="listaEmpresas"></tbody></table>
+          <p class="error" id="errEmpresas"></p>
+        </div>
+        <div class="tarjeta">
+          <h2>Dar de alta una empresa</h2>
+          <div class="fila">
+            <div><label for="nNombre">Nombre</label><input id="nNombre"></div>
+            <div><label for="nEmail">Email de acceso</label><input id="nEmail" type="email"></div>
+            <div><label for="nPass">Contraseña (mín. 8)</label><input id="nPass" type="text" autocomplete="off"></div>
+            <div class="ajustado"><button id="btnNuevaEmpresa">Dar de alta</button></div>
+          </div>
+          <p class="nota">Comunica el email y la contraseña a la empresa para que entre en su panel.</p>
+          <p class="error" id="errNueva"></p>
+        </div>
+      </div>
+
+      <!-- Detalle de una empresa -->
+      <div id="pDetalle" class="oculto">
+        <p><button class="sec" id="btnVolver">Volver a empresas</button></p>
+        <h2 id="detNombre" style="font-size:1.5rem;margin:6px 0 2px"></h2>
+        <p class="nota" id="detEmail" style="margin-top:0"></p>
+        <div class="tarjeta">
+          <h2>Camiones</h2>
+          <div class="fila">
+            <div><label for="dMatricula">Matrícula</label><input id="dMatricula" placeholder="1234ABC"></div>
+            <div><label for="dDesc">Descripción</label><input id="dDesc"></div>
+            <div class="ajustado"><button id="btnCamion">Añadir</button></div>
+          </div>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Matrícula</th><th>Descripción</th><th>Conductor asignado</th><th></th></tr></thead>
+            <tbody id="detCamiones"></tbody></table>
+          <p class="error" id="errCamiones"></p>
+        </div>
+        <div class="tarjeta">
+          <h2>Conductores</h2>
+          <div class="fila">
+            <div><label for="dConductor">Nombre</label><input id="dConductor"></div>
+            <div class="ajustado"><button id="btnConductor">Añadir</button></div>
+          </div>
+          <div id="nuevoPin" class="oculto credenciales"></div>
+          <table class="apilada" style="margin-top:12px"><thead><tr><th>Nombre</th><th>Código</th><th>Camión</th><th>Aviso leído</th><th></th></tr></thead>
+            <tbody id="detConductores"></tbody></table>
+          <p class="error" id="errConductores"></p>
+        </div>
+      </div>
+
+      <!-- Mapa general -->
+      <div id="pMapa" class="oculto">
+        <div class="tarjeta"><p class="nota" id="resumenMapa" style="margin:0">Cargando…</p></div>
+        <div id="mapaGeneral" class="mapa"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="comun.js"></script>
+  <script>
+    const S = sesion('admin');
+    const $ = id => document.getElementById(id);
+    const tk = () => S.token();
+    let empresaActual = null, mapa, capa, primeraVez = true;
+
+    // Operaciones sobre una empresa concreta
+    const gestionar = (accion, datos = {}) => api('/api/admin/gestionar', { empresa_id: empresaActual.id, accion, datos }, tk());
+
+    $('btnEntrar').onclick = async () => {
+      try {
+        const r = await api('/api/admin/login', { usuario: $('aUsuario').value, password: $('aPass').value });
+        S.guardar({ token: r.token, usuario: r.usuario }); arrancar();
+      } catch (e) { $('errA').textContent = e.message; }
+    };
+    $('aPass').onkeydown = e => { if (e.key === 'Enter') $('btnEntrar').click(); };
+    $('btnSalir').onclick = () => { S.borrar(); location.reload(); };
+
+    function verPestana(p) {
+      document.querySelectorAll('.pestanas button').forEach(x => x.classList.toggle('activa', x.dataset.p === p || (p === 'pDetalle' && x.dataset.p === 'pEmpresas')));
+      ['pEmpresas', 'pDetalle', 'pMapa'].forEach(x => $(x).classList.toggle('oculto', x !== p));
+      if (p === 'pMapa') {
+        if (!mapa) { mapa = crearMapa('mapaGeneral'); capa = L.layerGroup().addTo(mapa); }
+        mapa.invalidateSize(); cargarMapa();
+      }
+      if (p === 'pEmpresas') cargarEmpresas();
+    }
+    document.querySelectorAll('.pestanas button').forEach(b => b.onclick = () => verPestana(b.dataset.p));
+    $('btnVolver').onclick = () => verPestana('pEmpresas');
+
+    async function arrancar() {
+      if (!tk()) return;
+      try { await cargarEmpresas(); } catch { S.borrar(); return; }
+      $('vAcceso').classList.add('oculto'); $('vPanel').classList.remove('oculto'); $('btnSalir').classList.remove('oculto');
+      setInterval(() => { if (!$('pMapa').classList.contains('oculto')) cargarMapa(); }, 15000);
+    }
+
+    // ---------- Empresas ----------
+    let empresas = [];
+    async function cargarEmpresas() {
+      empresas = await api('/api/admin/empresas', null, tk());
+      const t = k => empresas.reduce((s, e) => s + e[k], 0);
+      $('resumen').textContent = `${empresas.length} ${empresas.length === 1 ? 'empresa' : 'empresas'}, ${t('camiones')} camiones, ${t('conductores')} conductores, ${t('en_ruta')} en ruta ahora.`;
+      $('listaEmpresas').innerHTML = empresas.map(e => `<tr>
+          <td><b>${esc(e.nombre)}</b></td><td>${esc(e.email)}</td><td data-etiqueta="Alta">${e.creado ? new Date(e.creado.replace(' ', 'T') + 'Z').toLocaleDateString('es-ES') : ''}</td>
+          <td data-etiqueta="Camiones">${e.camiones}</td><td data-etiqueta="Conductores">${e.conductores}</td><td data-etiqueta="En ruta">${e.en_ruta ? `<span class="estado on">${e.en_ruta}</span>` : '0'}</td>
+          <td class="acciones"><button class="sec ver" data-id="${e.id}">Gestionar</button> <button class="quitar empresa" data-id="${e.id}" data-nombre="${esc(e.nombre)}">Quitar</button></td></tr>`).join('')
+        || '<tr><td colspan="7" class="nota">Todavía no hay empresas. Da de alta la primera con el formulario de abajo.</td></tr>';
+      document.querySelectorAll('button.ver').forEach(b => b.onclick = () => abrirEmpresa(Number(b.dataset.id)));
+      document.querySelectorAll('button.quitar.empresa').forEach(b => b.onclick = async () => {
+        if (!confirm(`¿Quitar la empresa ${b.dataset.nombre}? Se borrarán también todos sus camiones, conductores y rutas. No se puede deshacer.`)) return;
+        $('errEmpresas').textContent = '';
+        try { await api('/api/admin/empresas/quitar', { id: Number(b.dataset.id) }, tk()); }
+        catch (err) { $('errEmpresas').textContent = err.message; }
+        cargarEmpresas();
+      });
+    }
+    $('btnNuevaEmpresa').onclick = async () => {
+      $('errNueva').textContent = '';
+      try {
+        await api('/api/admin/empresas', { nombre: $('nNombre').value, email: $('nEmail').value, password: $('nPass').value }, tk());
+        $('nNombre').value = $('nEmail').value = $('nPass').value = '';
+        cargarEmpresas();
+      } catch (e) { $('errNueva').textContent = e.message; }
+    };
+
+    // ---------- Detalle de una empresa ----------
+    async function abrirEmpresa(id) {
+      empresaActual = empresas.find(e => e.id === id);
+      $('detNombre').textContent = empresaActual.nombre;
+      $('detEmail').textContent = empresaActual.email;
+      $('nuevoPin').classList.add('oculto');
+      verPestana('pDetalle');
+      await cargarDetalle();
+    }
+    async function cargarDetalle() {
+      $('errCamiones').textContent = $('errConductores').textContent = '';
+      const [cams, cs] = await Promise.all([gestionar('GET camiones'), gestionar('GET conductores')]);
+      const opciones = sel => '<option value="">Sin conductor</option>' + cs.map(c => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.nombre)}</option>`).join('');
+      $('detCamiones').innerHTML = cams.map(c => `<tr><td>${placa(c.matricula)}</td><td>${esc(c.descripcion)}</td>
+          <td><select class="asignar" data-camion="${c.id}" aria-label="Conductor de ${esc(c.matricula)}">${opciones(c.conductor_id)}</select></td>
+          <td class="acciones"><button class="quitar" data-accion="POST camiones/quitar" data-id="${c.id}" data-nombre="el camión ${esc(c.matricula)}">Quitar</button></td></tr>`).join('')
+        || '<tr><td colspan="4" class="nota">Esta empresa no tiene camiones.</td></tr>';
+      const camionDe = id => cams.find(c => c.conductor_id === id);
+      $('detConductores').innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td><code>${c.codigo}</code></td>
+          <td>${camionDe(c.id) ? placa(camionDe(c.id).matricula) : '<span class="nota">Sin asignar</span>'}</td>
+          <td>${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
+          <td class="acciones"><button class="quitar" data-accion="POST conductores/quitar" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
+        || '<tr><td colspan="5" class="nota">Esta empresa no tiene conductores.</td></tr>';
+
+      document.querySelectorAll('#detCamiones .asignar').forEach(s => s.onchange = async () => {
+        try { await gestionar('POST asignar', { camion_id: Number(s.dataset.camion), conductor_id: s.value ? Number(s.value) : null }); }
+        catch (err) { $('errCamiones').textContent = err.message; }
+        cargarDetalle();
+      });
+      document.querySelectorAll('#pDetalle button.quitar').forEach(b => b.onclick = async () => {
+        const esCamion = b.dataset.accion.startsWith('POST camiones');
+        if (!confirm(esCamion ? `¿Quitar ${b.dataset.nombre}? También se borrará su historial de rutas.`
+                              : `¿Quitar ${b.dataset.nombre}? Ya no podrá entrar en la app y se borrará su historial de jornadas.`)) return;
+        try { await gestionar(b.dataset.accion, { id: Number(b.dataset.id) }); }
+        catch (err) { $(esCamion ? 'errCamiones' : 'errConductores').textContent = err.message; }
+        cargarDetalle();
+      });
+    }
+    $('btnCamion').onclick = async () => {
+      try { await gestionar('POST camiones', { matricula: $('dMatricula').value, descripcion: $('dDesc').value }); $('dMatricula').value = $('dDesc').value = ''; }
+      catch (e) { $('errCamiones').textContent = e.message; }
+      cargarDetalle();
+    };
+    $('btnConductor').onclick = async () => {
+      try {
+        const r = await gestionar('POST conductores', { nombre: $('dConductor').value });
+        $('nuevoPin').innerHTML = `<span>Código <code>${r.codigo}</code></span><span>PIN <code>${r.pin}</code></span><span>Entrégaselo al conductor: el PIN no se vuelve a mostrar.</span>`;
+        $('nuevoPin').classList.remove('oculto'); $('dConductor').value = '';
+      } catch (e) { $('errConductores').textContent = e.message; }
+      cargarDetalle();
+    };
+
+    // ---------- Mapa general ----------
+    async function cargarMapa() {
+      const lista = await api('/api/admin/en-directo', null, tk());
+      capa.clearLayers();
+      const puntos = [];
+      lista.forEach(c => {
+        if (c.lat == null) return;
+        puntos.push([c.lat, c.lng]);
+        L.marker([c.lat, c.lng], { icon: iconoCamion(c.matricula) }).addTo(capa).bindPopup(
+          `${placa(c.matricula)}<br><b>${esc(c.empresa)}</b><br>${esc(c.conductor)}<br>${c.velocidad != null ? c.velocidad + ' km/h<br>' : ''}Última señal: ${fecha(c.ts)}`);
+      });
+      $('resumenMapa').textContent = lista.length
+        ? `${lista.length === 1 ? '1 camión en ruta' : lista.length + ' camiones en ruta'} entre todas las empresas. Se actualiza cada 15 segundos.`
+        : 'Ningún camión de ninguna empresa está en ruta ahora mismo.';
+      if (puntos.length && primeraVez) { mapa.fitBounds(puntos, { maxZoom: 13, padding: [40, 40] }); primeraVez = false; }
+    }
+
+    arrancar();
+  </script>
+</body>
+</html>

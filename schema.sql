@@ -23,3 +23,8 @@ CREATE TABLE IF NOT EXISTS sesiones (
 -- Conductor asignado a cada camión (un conductor solo puede tener un camión)
 -- En una base de datos ya creada: ALTER TABLE camiones ADD COLUMN conductor_id INTEGER REFERENCES conductores(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_camion_conductor ON camiones(conductor_id) WHERE conductor_id IS NOT NULL;
+
+-- Administradores de la aplicación (gestionan todas las empresas)
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, pass_hash TEXT NOT NULL,
+  creado TEXT DEFAULT (datetime('now')));

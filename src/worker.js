@@ -167,6 +167,74 @@ const rutas = {
     return json(jornadas.map((j, i) => ({ ...j, puntos: puntos[i].results })));
   },
 
+  // ---------- ADMINISTRADOR DE LA APLICACIÓN ----------
+  'POST /api/admin/login': async ({ db, body }) => {
+    const a = await db.prepare('SELECT * FROM admins WHERE usuario = ?').bind((body.usuario || '').trim().toLowerCase()).first();
+    if (!a || !(await verificar(body.password || '', a.pass_hash))) return error('Datos incorrectos', 401);
+    return json({ token: await nuevaSesion(db, 'admin', a.id), usuario: a.usuario });
+  },
+
+  'GET /api/admin/empresas': async ({ db }) => json((await db.prepare(`
+    SELECT e.id, e.nombre, e.email, e.creado,
+      (SELECT COUNT(*) FROM camiones WHERE empresa_id = e.id) AS camiones,
+      (SELECT COUNT(*) FROM conductores WHERE empresa_id = e.id) AS conductores,
+      (SELECT COUNT(*) FROM jornadas j JOIN camiones c ON c.id = j.camion_id WHERE c.empresa_id = e.id AND j.fin IS NULL) AS en_ruta
+    FROM empresas e ORDER BY e.nombre`).all()).results),
+
+  'POST /api/admin/empresas': async ({ db, body }) => {
+    const { nombre, email, password } = body;
+    if (!nombre || !email || !password || password.length < 8)
+      return error('Faltan datos (contraseña mínimo 8 caracteres)', 400);
+    try {
+      const r = await db.prepare('INSERT INTO empresas (nombre, email, pass_hash) VALUES (?,?,?)')
+        .bind(nombre.trim(), email.trim().toLowerCase(), await hash(password)).run();
+      return json({ id: r.meta.last_row_id });
+    } catch { return error('Ese email ya está registrado', 409); }
+  },
+
+  // Quitar una empresa con todo lo suyo: camiones, conductores, rutas y sesiones
+  'POST /api/admin/empresas/quitar': async ({ db, body }) => {
+    const e = await db.prepare('SELECT id FROM empresas WHERE id = ?').bind(Number(body.id)).first();
+    if (!e) return error('Empresa no válida', 400);
+    const enRuta = await db.prepare(`SELECT COUNT(*) AS n FROM jornadas j JOIN camiones c ON c.id = j.camion_id
+      WHERE c.empresa_id = ? AND j.fin IS NULL`).bind(e.id).first();
+    if (enRuta.n) return error('Esta empresa tiene camiones en ruta. Espera a que finalicen las jornadas para quitarla.', 409);
+    await db.batch([
+      db.prepare(`DELETE FROM posiciones WHERE jornada_id IN (SELECT j.id FROM jornadas j JOIN camiones c ON c.id = j.camion_id WHERE c.empresa_id = ?)`).bind(e.id),
+      db.prepare('DELETE FROM jornadas WHERE camion_id IN (SELECT id FROM camiones WHERE empresa_id = ?)').bind(e.id),
+      db.prepare(`DELETE FROM sesiones WHERE tipo = 'conductor' AND ref_id IN (SELECT id FROM conductores WHERE empresa_id = ?)`).bind(e.id),
+      db.prepare(`DELETE FROM sesiones WHERE tipo = 'empresa' AND ref_id = ?`).bind(e.id),
+      db.prepare('UPDATE camiones SET conductor_id = NULL WHERE empresa_id = ?').bind(e.id),
+      db.prepare('DELETE FROM conductores WHERE empresa_id = ?').bind(e.id),
+      db.prepare('DELETE FROM camiones WHERE empresa_id = ?').bind(e.id),
+      db.prepare('DELETE FROM empresas WHERE id = ?').bind(e.id),
+    ]);
+    return json({ ok: true });
+  },
+
+  'GET /api/admin/en-directo': async ({ db }) => json((await db.prepare(`
+    SELECT j.id AS jornada_id, c.matricula, co.nombre AS conductor, e.nombre AS empresa, j.inicio,
+           p.lat, p.lng, p.velocidad, p.ts
+    FROM jornadas j
+    JOIN camiones c ON c.id = j.camion_id
+    JOIN empresas e ON e.id = c.empresa_id
+    JOIN conductores co ON co.id = j.conductor_id
+    LEFT JOIN posiciones p ON p.id = (SELECT id FROM posiciones WHERE jornada_id = j.id ORDER BY ts DESC LIMIT 1)
+    WHERE j.fin IS NULL`).all()).results),
+
+  // Gestionar una empresa concreta reutilizando las mismas operaciones que usa la propia empresa
+  'POST /api/admin/gestionar': async (ctx) => {
+    const { db, body } = ctx;
+    const permitidas = ['GET camiones', 'GET conductores', 'POST camiones', 'POST conductores',
+      'POST asignar', 'POST camiones/quitar', 'POST conductores/quitar'];
+    if (!permitidas.includes(body.accion)) return error('Acción no permitida', 400);
+    const e = await db.prepare('SELECT id FROM empresas WHERE id = ?').bind(Number(body.empresa_id)).first();
+    if (!e) return error('Empresa no válida', 400);
+    const [metodo, ruta] = body.accion.split(' ');
+    const datos = body.datos && typeof body.datos === 'object' ? body.datos : {};
+    return rutas[`${metodo} /api/empresa/${ruta}`]({ ...ctx, uid: e.id, body: datos });
+  },
+
   // ---------- CONDUCTOR ----------
   'POST /api/conductor/login': async ({ db, body }) => {
     const c = await db.prepare(`SELECT co.*, e.nombre AS empresa FROM conductores co
@@ -228,7 +296,8 @@ const rutas = {
     WHERE j.conductor_id = ? ORDER BY j.inicio DESC LIMIT 50`).bind(uid).all()).results),
 };
 
-const publicas = new Set(['POST /api/empresa/registro', 'POST /api/empresa/login', 'POST /api/conductor/login']);
+const publicas = new Set(['POST /api/empresa/registro', 'POST /api/empresa/login', 'POST /api/conductor/login', 'POST /api/admin/login']);
+const tipoDeRuta = p => p.startsWith('/api/empresa/') ? 'empresa' : p.startsWith('/api/admin/') ? 'admin' : 'conductor';
 
 export default {
   async fetch(req, env) {
@@ -242,7 +311,7 @@ export default {
     const db = env.DB;
     let uid = null;
     if (!publicas.has(clave)) {
-      uid = await usuario(req, db, url.pathname.startsWith('/api/empresa/') ? 'empresa' : 'conductor');
+      uid = await usuario(req, db, tipoDeRuta(url.pathname));
       if (!uid) return error('Sesión no válida', 401);
     }
     let body = {};
