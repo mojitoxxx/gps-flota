@@ -183,6 +183,23 @@ const rutas = {
     return json(jornadas.map((j, i) => ({ ...j, puntos: puntos[i].results })));
   },
 
+  // ---------- APP ANDROID ----------
+  // Descarga de la APK con la versión en el nombre del archivo (GPS-Flota-1.3.apk)
+  'GET /api/app/descargar': async ({ env, url }) => {
+    const apk = await env.ASSETS.fetch(new URL('/gps-flota.apk', url));
+    if (!apk.ok) return error('La app todavía no está disponible.', 404);
+    let version = null;
+    try { version = await (await env.ASSETS.fetch(new URL('/app-version.json', url))).json(); } catch {}
+    const nombre = version && version.versionName ? `GPS-Flota-${version.versionName}.apk` : 'GPS-Flota.apk';
+    return new Response(apk.body, {
+      headers: {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Disposition': `attachment; filename="${nombre}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  },
+
   // ---------- ADMINISTRADOR DE LA APLICACIÓN ----------
   'POST /api/admin/login': async ({ db, body }) => {
     const a = await db.prepare('SELECT * FROM admins WHERE usuario = ?').bind((body.usuario || '').trim().toLowerCase()).first();
@@ -320,7 +337,8 @@ const rutas = {
     WHERE j.conductor_id = ? ORDER BY j.inicio DESC LIMIT 50`).bind(uid).all()).results),
 };
 
-const publicas = new Set(['POST /api/empresa/registro', 'POST /api/empresa/login', 'POST /api/conductor/login', 'POST /api/admin/login']);
+const publicas = new Set(['POST /api/empresa/registro', 'POST /api/empresa/login', 'POST /api/conductor/login', 'POST /api/admin/login',
+  'GET /api/app/descargar']);
 const tipoDeRuta = p => p.startsWith('/api/empresa/') ? 'empresa' : p.startsWith('/api/admin/') ? 'admin' : 'conductor';
 
 export default {

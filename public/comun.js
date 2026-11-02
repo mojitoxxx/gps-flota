@@ -100,8 +100,8 @@ const fecha = iso => new Date(iso).toLocaleString('es-ES', { dateStyle: 'short',
     const barra = document.createElement('div');
     barra.className = 'aviso-version';
     barra.setAttribute('role', 'status');
-    barra.innerHTML = `<span>Hay una versión nueva de la app (${esc(v.versionName || v.versionCode)}).</span>
-      <a href="/gps-flota.apk?v=${v.versionCode}">Actualizar</a><button type="button">Más tarde</button>`;
+    barra.innerHTML = `<span>Hay una versión nueva de la app. Tienes la ${esc('1.' + actual)}.</span>
+      <a href="/api/app/descargar?v=${v.versionCode}">Actualizar a la ${esc(v.versionName || v.versionCode)}</a><button type="button">Más tarde</button>`;
     barra.querySelector('button').onclick = () => {
       barra.remove();
       try { sessionStorage.setItem('gpsflota_aviso_oculto', String(v.versionCode)); } catch {}

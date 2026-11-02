@@ -34,9 +34,9 @@
         </nav>
       </div>
     </section>
-    <a class="descarga-app" href="gps-flota.apk" download>
+    <a class="descarga-app" href="/api/app/descargar">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span><b>Descargar la app para Android</b><small>Para los conductores. Archivo APK, versión de prueba.</small></span>
+      <span><b>Descargar la app para Android</b><small id="infoApp">Para los conductores. Archivo APK, versión de prueba.</small></span>
     </a>
     <div class="pie-portada nota">
       <span>La ubicación solo se registra durante la jornada que inicia el conductor.</span>
@@ -44,5 +44,11 @@
     </div>
   </main>
   <script src="comun.js"></script>
+  <script>
+    // Mostrar la versión publicada de la app en el botón de descarga
+    fetch('/app-version.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(v => {
+      if (v && v.versionName) document.getElementById('infoApp').textContent = `Versión ${v.versionName} · Para los conductores. Archivo APK de prueba.`;
+    }).catch(() => {});
+  </script>
 </body>
 </html>
