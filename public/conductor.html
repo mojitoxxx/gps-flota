@@ -70,6 +70,7 @@
       try {
         const r = await api('/api/conductor/login', { codigo: $('codigo').value, pin: $('pin').value });
         S.guardar({ token: r.token, nombre: r.nombre, empresa: r.empresa });
+        $('errLogin').textContent = '';
         arrancar();
       } catch (e) { $('errLogin').textContent = e.message; }
     };
@@ -81,7 +82,7 @@
       if (!S.token()) return ver('vLogin');
       let est;
       try { est = await api('/api/conductor/estado', null, S.token()); }
-      catch { S.borrar(); return ver('vLogin'); }
+      catch (e) { if (e.status === 401) return sesionCerrada(); S.borrar(); return ver('vLogin'); }
       if (!est.aviso_aceptado) {
         $('textoAviso').innerHTML = await (await fetch('aviso-conductor.html')).text();
         return ver('vAviso');
@@ -147,6 +148,14 @@
       }, err => { $('infoGps').textContent = ({ 1: 'No hay permiso de ubicación. Actívalo para esta web en los ajustes del navegador.', 2: 'No hay señal GPS. Comprueba que la ubicación del móvil está encendida.', 3: 'El GPS está tardando en responder. Seguimos intentándolo.' })[err.code] || 'Error de GPS.'; },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
     }
+    // La empresa ha cambiado el PIN o ha cerrado la sesión: volver a la pantalla de entrada
+    function sesionCerrada() {
+      pararGps(); S.borrar();
+      if (marca) { marca.remove(); marca = null; }
+      $('pin').value = '';
+      ver('vLogin');
+      $('errLogin').textContent = 'Tu sesión se ha cerrado, por ejemplo porque te han cambiado el PIN. Vuelve a entrar con el PIN nuevo.';
+    }
     function pararGps() { if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; }
 
     // Envía cada 15 s; si no hay cobertura, los puntos esperan en la cola
@@ -154,7 +163,10 @@
       if (!cola.length || !S.token()) return;
       const lote = cola.splice(0, 500);
       try { await api('/api/conductor/posiciones', lote, S.token()); }
-      catch { cola = lote.concat(cola); }
+      catch (e) {
+        cola = lote.concat(cola);  // se guardan para enviarlos cuando vuelva a entrar o haya cobertura
+        if (e.status === 401) sesionCerrada();
+      }
     }
     setInterval(enviarCola, 15000);
 

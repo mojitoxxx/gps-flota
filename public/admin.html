@@ -74,6 +74,7 @@
           <h2>Conductores</h2>
           <div class="fila">
             <div><label for="dConductor">Nombre</label><input id="dConductor"></div>
+            <div><label for="dPinConductor">PIN (opcional)</label><input id="dPinConductor" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Al azar si lo dejas vacío"></div>
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
@@ -176,7 +177,7 @@
         desasignar: (camion_id, conductor_id) => gestionar('POST desasignar', { camion_id, conductor_id }),
         quitar: (tipo, id) => gestionar(`POST ${tipo}/quitar`, { id }),
         error: (tipo, msg) => { $(tipo === 'camiones' ? 'errCamiones' : 'errConductores').textContent = msg; },
-        nuevoPin: id => gestionar('POST conductores/nuevo-pin', { id }),
+        nuevoPin: (id, pin) => gestionar('POST conductores/nuevo-pin', { id, pin }),
         mostrarPin: (nombre, codigo, pin) => {
           $('nuevoPin').innerHTML = `<span><b>${esc(nombre)}</b></span><span>Código <code>${codigo}</code></span><span>PIN nuevo <code>${pin}</code></span><span>Entrégaselo al conductor ahora: no se vuelve a mostrar.</span>`;
           $('nuevoPin').classList.remove('oculto'); $('nuevoPin').scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -191,9 +192,9 @@
     };
     $('btnConductor').onclick = async () => {
       try {
-        const r = await gestionar('POST conductores', { nombre: $('dConductor').value });
+        const r = await gestionar('POST conductores', { nombre: $('dConductor').value, pin: $('dPinConductor').value });
         $('nuevoPin').innerHTML = `<span>Código <code>${r.codigo}</code></span><span>PIN <code>${r.pin}</code></span><span>Entrégaselo al conductor: el PIN no se vuelve a mostrar.</span>`;
-        $('nuevoPin').classList.remove('oculto'); $('dConductor').value = '';
+        $('nuevoPin').classList.remove('oculto'); $('dConductor').value = $('dPinConductor').value = '';
       } catch (e) { $('errConductores').textContent = e.message; }
       cargarDetalle();
     };

@@ -5,7 +5,7 @@ async function api(url, cuerpo, token) {
   if (token) opciones.headers.Authorization = 'Bearer ' + token;
   const r = await fetch(url, opciones);
   const datos = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(datos.error || 'Error ' + r.status);
+  if (!r.ok) { const e = new Error(datos.error || 'Error ' + r.status); e.status = r.status; throw e; }
   return datos;
 }
 
@@ -60,7 +60,7 @@ function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
   tbodyConductores.innerHTML = cs.map(c => `<tr><td>${esc(c.nombre)}</td><td data-etiqueta="Código"><code>${c.codigo}</code></td>
       <td>${camionesDe(c.id).map(k => placa(k.matricula)).join(' ') || '<span class="nota">Sin camión</span>'}</td>
       <td data-etiqueta="Aviso leído">${c.aviso_aceptado ? fecha(c.aviso_aceptado) : 'Pendiente'}</td>
-      <td class="acciones"><button class="sec nuevo-pin" data-id="${c.id}" data-nombre="${esc(c.nombre)}">Nuevo PIN</button> <button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
+      <td class="acciones"><button class="sec nuevo-pin" data-id="${c.id}" data-nombre="${esc(c.nombre)}">Cambiar PIN</button> <button class="quitar" data-tipo="conductores" data-id="${c.id}" data-nombre="a ${esc(c.nombre)}">Quitar</button></td></tr>`).join('')
     || '<tr><td colspan="5" class="nota">Todavía no hay conductores. Añádelos para darles su código y PIN.</td></tr>';
 
   const intentar = async (tipo, fn) => { try { await fn(); } catch (e) { acciones.error(tipo, e.message); return; } acciones.recargar(); };
@@ -69,8 +69,9 @@ function pintarFlota(cams, cs, tbodyCamiones, tbodyConductores, acciones) {
   tbodyCamiones.querySelectorAll('button.desasignar').forEach(b => b.onclick = () =>
     intentar('camiones', () => acciones.desasignar(Number(b.dataset.camion), Number(b.dataset.conductor))));
   tbodyConductores.querySelectorAll('button.nuevo-pin').forEach(b => b.onclick = async () => {
-    if (!confirm(`¿Generar un PIN nuevo para ${b.dataset.nombre}? El PIN anterior dejará de servir para entrar.`)) return;
-    try { const r = await acciones.nuevoPin(Number(b.dataset.id)); acciones.mostrarPin(b.dataset.nombre, r.codigo, r.pin); }
+    const pin = prompt(`PIN nuevo para ${b.dataset.nombre}.\n\nEscribe uno de 4 a 8 cifras, o déjalo vacío para generar uno al azar.\nEl PIN anterior dejará de servir y se cerrará su sesión en el móvil.`, '');
+    if (pin === null) return;  // cancelado
+    try { const r = await acciones.nuevoPin(Number(b.dataset.id), pin.trim()); acciones.mostrarPin(b.dataset.nombre, r.codigo, r.pin); }
     catch (e) { acciones.error('conductores', e.message); }
   });
     [tbodyCamiones, tbodyConductores].forEach(t => t.querySelectorAll('button.quitar').forEach(b => b.onclick = () => {

@@ -25,6 +25,19 @@ async function verificar(pw, guardado) {
   return dif === 0;
 }
 
+// PIN elegido por la empresa: de 4 a 8 cifras y que no sea demasiado fácil (1111, 1234, 4321...)
+function pinElegido(valor) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return { pin: String(aleatorio(100000, 1000000)) };
+  const pin = String(valor).trim();
+  if (!/^\d{4,8}$/.test(pin)) return { error: 'El PIN debe tener entre 4 y 8 cifras, solo números.' };
+  const d = [...pin].map(Number);
+  const iguales = d.every(x => x === d[0]);
+  const sube = d.every((x, i) => i === 0 || x === (d[i - 1] + 1) % 10);
+  const baja = d.every((x, i) => i === 0 || x === (d[i - 1] + 9) % 10);
+  if (iguales || sube || baja) return { error: 'Ese PIN es demasiado fácil de adivinar. Elige otro.' };
+  return { pin };
+}
+
 const json = (datos, status = 200) => new Response(JSON.stringify(datos), {
   status, headers: { 'Content-Type': 'application/json; charset=utf-8' },
 });
@@ -84,12 +97,18 @@ const rutas = {
     return json({ ok: true });
   },
 
-  // Generar un PIN nuevo para un conductor (el PIN se guarda cifrado y no se puede leer)
+  // Cambiar el PIN de un conductor: el que elija la empresa o uno al azar (se guarda cifrado y no se puede leer)
   'POST /api/empresa/conductores/nuevo-pin': async ({ db, uid, body }) => {
     const co = await db.prepare('SELECT id, codigo FROM conductores WHERE id = ? AND empresa_id = ?').bind(Number(body.id), uid).first();
     if (!co) return error('Conductor no válido', 400);
-    const pin = String(aleatorio(100000, 1000000));
-    await db.prepare('UPDATE conductores SET pin_hash = ? WHERE id = ?').bind(await hash(pin), co.id).run();
+    const elegido = pinElegido(body.pin);
+    if (elegido.error) return error(elegido.error, 400);
+    const pin = elegido.pin;
+    await db.batch([
+      db.prepare('UPDATE conductores SET pin_hash = ? WHERE id = ?').bind(await hash(pin), co.id),
+      // se cierran sus sesiones abiertas: tendrá que entrar con el PIN nuevo
+      db.prepare(`DELETE FROM sesiones WHERE tipo = 'conductor' AND ref_id = ?`).bind(co.id),
+    ]);
     return json({ codigo: co.codigo, pin }); // se muestra solo esta vez
   },
 
@@ -146,7 +165,9 @@ const rutas = {
 
   'POST /api/empresa/conductores': async ({ db, uid, body }) => {
     if (!body.nombre) return error('Falta el nombre', 400);
-    const pin = String(aleatorio(100000, 1000000));
+    const elegido = pinElegido(body.pin);
+    if (elegido.error) return error(elegido.error, 400);
+    const pin = elegido.pin;
     for (let intento = 0; intento < 5; intento++) {
       const codigo = 'C' + aleatorio(100000, 1000000);
       try {

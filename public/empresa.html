@@ -74,7 +74,8 @@
           <h2>Conductores</h2>
           <p class="nota">Al crear un conductor se genera un código y un PIN. Entrégaselos junto con la información sobre la geolocalización: el PIN no se vuelve a mostrar.</p>
           <div class="fila">
-            <div><label>Nombre</label><input id="nConductor"></div>
+            <div><label for="nConductor">Nombre</label><input id="nConductor"></div>
+            <div><label for="nPinConductor">PIN (opcional)</label><input id="nPinConductor" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Al azar si lo dejas vacío"></div>
             <div class="ajustado"><button id="btnConductor">Añadir</button></div>
           </div>
           <div id="nuevoPin" class="oculto credenciales"></div>
@@ -183,7 +184,7 @@
         desasignar: (camion_id, conductor_id) => api('/api/empresa/desasignar', { camion_id, conductor_id }, tk()),
         quitar: (tipo, id) => api(`/api/empresa/${tipo}/quitar`, { id }, tk()),
         error: (tipo, msg) => { $(tipo === 'camiones' ? 'errAsignar' : 'errConductores').textContent = msg; },
-        nuevoPin: id => api('/api/empresa/conductores/nuevo-pin', { id }, tk()),
+        nuevoPin: (id, pin) => api('/api/empresa/conductores/nuevo-pin', { id, pin }, tk()),
         mostrarPin: (nombre, codigo, pin) => {
           $('nuevoPin').innerHTML = `<span><b>${esc(nombre)}</b></span><span>Código <code>${codigo}</code></span><span>PIN nuevo <code>${pin}</code></span><span>Entrégaselo al conductor ahora: no se vuelve a mostrar.</span>`;
           $('nuevoPin').classList.remove('oculto'); $('nuevoPin').scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -197,9 +198,9 @@
     };
     $('btnConductor').onclick = async () => {
       try {
-        const r = await api('/api/empresa/conductores', { nombre: $('nConductor').value }, tk());
+        const r = await api('/api/empresa/conductores', { nombre: $('nConductor').value, pin: $('nPinConductor').value }, tk());
         $('nuevoPin').innerHTML = `<span>Código <code>${r.codigo}</code></span><span>PIN <code>${r.pin}</code></span><span>Entrégaselo al conductor ahora: el PIN no se vuelve a mostrar.</span>`;
-        $('nuevoPin').classList.remove('oculto'); $('nConductor').value = ''; cargarFlota();
+        $('nuevoPin').classList.remove('oculto'); $('nConductor').value = $('nPinConductor').value = ''; cargarFlota();
       } catch (e) { alert(e.message); }
     };
 
