@@ -77,11 +77,13 @@ jobs:
 
       - name: Publicarla en la web
         run: |
+          # deshacer el cambio temporal de la configuración antes de guardar
+          git checkout -- android-app/capacitor.config.json
           cp android-app/android/app/build/outputs/apk/debug/app-debug.apk public/gps-flota.apk
           echo "{\"versionCode\": $VERSION_CODE, \"versionName\": \"$VERSION_NAME\"}" > public/app-version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/gps-flota.apk public/app-version.json
           git commit -m "APK Android $VERSION_NAME"
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push origin HEAD:main
